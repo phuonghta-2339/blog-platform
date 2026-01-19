@@ -6,6 +6,7 @@ export interface AppConfig {
   port: number;
   host: string;
   apiPrefix: string;
+  defaultVersion: string;
   corsOrigin: string[];
   corsMethods: string[];
   corsAllowedHeaders: string[];
@@ -19,7 +20,8 @@ export default registerAs(
     name: process.env.APP_NAME || 'Blog Platform',
     port: parseInt(process.env.PORT || '3000', 10),
     host: process.env.HOST || 'localhost',
-    apiPrefix: process.env.API_PREFIX || 'api/v1',
+    apiPrefix: process.env.API_PREFIX || 'api',
+    defaultVersion: process.env.API_DEFAULT_VERSION || '1',
     corsOrigin: process.env.CORS_ORIGIN?.split(',').map((origin) =>
       origin.trim(),
     ) || ['http://localhost:3000'],

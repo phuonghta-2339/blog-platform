@@ -1,25 +1,25 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { HealthCheckResponseDto } from './common/dto/health-check.dto';
 import { BaseResponseDto } from './common/dto/response.dto';
 
 @ApiTags('health')
-@Controller()
+@Controller({ version: VERSION_NEUTRAL })
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
   @ApiOperation({
-    summary: 'Welcome endpoint',
-    description: 'Returns a welcome message from the API',
+    summary: 'Root endpoint',
+    description: 'Returns API root information',
   })
   @ApiResponse({
     status: 200,
-    description: 'Welcome message returned successfully',
+    description: 'Root endpoint accessed successfully',
     type: BaseResponseDto,
   })
-  getHello(): string {
+  getRoot(): string {
     return this.appService.getHello();
   }
 

@@ -1,4 +1,4 @@
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, VersioningType } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -19,8 +19,16 @@ async function bootstrap() {
     const configService = app.get(AppConfigService);
     const appConfig = configService.app;
 
-    // Global prefix
-    app.setGlobalPrefix(appConfig.apiPrefix);
+    // Global prefix (exclude root and health endpoints)
+    app.setGlobalPrefix(appConfig.apiPrefix, {
+      exclude: ['/', 'health'],
+    });
+
+    // Enable versioning
+    app.enableVersioning({
+      type: VersioningType.URI,
+      defaultVersion: String(appConfig.defaultVersion),
+    });
 
     // Global validation pipe
     app.useGlobalPipes(
