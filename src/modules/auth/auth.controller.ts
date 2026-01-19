@@ -1,6 +1,7 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Request, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { User } from '@prisma/client';
 import { AuthService } from './auth.service';
 import {
   ApiLogin,
@@ -10,9 +11,9 @@ import {
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { AuthResponseDto } from './dto/auth-response.dto';
-import { LoginDto } from './dto/login.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto';
 import { RegisterDto } from './dto/register.dto';
+import { LocalAuthGuard } from './guards/local-auth.guard';
 
 /**
  * Auth Controller
@@ -36,10 +37,11 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @UseGuards(LocalAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @ApiLogin()
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
-    return this.authService.login(loginDto);
+  login(@Request() req: { user: User }): AuthResponseDto {
+    return this.authService.login(req.user);
   }
 
   @Post('refresh')

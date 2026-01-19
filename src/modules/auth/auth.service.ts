@@ -9,7 +9,6 @@ import { User } from '@prisma/client';
 import { comparePassword, hashPassword } from '../../common/utils/hash.util';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
-import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 
@@ -84,21 +83,12 @@ export class AuthService {
   }
 
   /**
-   * Authenticate user with email and password
-   * @param loginDto - User login credentials
+   * Generate authentication response for validated user
+   * User is already validated by LocalStrategy before reaching this method
+   * @param user - Validated user object from LocalStrategy
    * @returns User data and JWT token
-   * @throws UnauthorizedException if credentials are invalid
    */
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    const { email, password } = loginDto;
-
-    // Validate user credentials
-    const user = await this.validateUser(email, password);
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
+  login(user: User): AuthResponseDto {
     // Generate JWT token
     const token = this.generateToken(user);
 

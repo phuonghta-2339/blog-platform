@@ -16,11 +16,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
+    const jwtSecret = configService.get<string>('app.jwtSecret');
+
+    if (!jwtSecret) {
+      throw new Error(
+        'JWT_SECRET configuration is missing. Cannot initialize JWT authentication.',
+      );
+    }
+
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('app.jwtSecret') || 'fallback-secret',
+      secretOrKey: jwtSecret,
     });
   }
 

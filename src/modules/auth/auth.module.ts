@@ -16,10 +16,17 @@ import { LocalStrategy } from './strategies/local.strategy';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
+        const jwtSecret = configService.get<string>('app.jwtSecret');
         const expiresIn = configService.get<string>('app.jwtExpiresIn') || '7d';
+
+        if (!jwtSecret) {
+          throw new Error(
+            'JWT_SECRET configuration is missing. Cannot initialize JWT module.',
+          );
+        }
+
         return {
-          secret:
-            configService.get<string>('app.jwtSecret') || 'fallback-secret',
+          secret: jwtSecret,
           signOptions: {
             expiresIn: expiresIn as StringValue,
           },

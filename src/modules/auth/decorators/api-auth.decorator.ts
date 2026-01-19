@@ -82,7 +82,7 @@ export const ApiRegister = (): MethodDecorator & ClassDecorator => {
       },
     }),
     ApiTooManyRequestsResponse({
-      description: 'Rate limit exceeded (1 request per minute)',
+      description: 'Rate limit exceeded (3 requests per minute)',
       schema: {
         example: {
           success: false,
@@ -138,7 +138,7 @@ export const ApiLogin = (): MethodDecorator & ClassDecorator => {
       },
     }),
     ApiTooManyRequestsResponse({
-      description: 'Rate limit exceeded (3 requests per minute)',
+      description: 'Rate limit exceeded (5 requests per minute)',
       schema: {
         example: {
           success: false,
