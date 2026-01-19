@@ -31,32 +31,43 @@ services:
       retries: 5
       start_period: 10s
     command:
-      # Additional PostgreSQL configuration
+      # PostgreSQL Performance Tuning Configuration
+      # ============================================
+      # These settings are optimized for a system with ~4GB RAM.
+      #
+      # For development (2GB RAM): Reduce shared_buffers to 128MB, effective_cache_size to 512MB
+      # For production (8GB+ RAM): Increase shared_buffers to 2GB, effective_cache_size to 6GB
+      #
+      # Adjust based on your system resources:
+      # - shared_buffers: 25% of available RAM (dev: 128MB, prod: 2-8GB)
+      # - effective_cache_size: 50-75% of available RAM (dev: 512MB, prod: 4-24GB)
+      # - maintenance_work_mem: 5-10% of RAM, up to 2GB (dev: 64MB, prod: 256MB-2GB)
+      # - work_mem: (RAM - shared_buffers) / (max_connections * 3) (dev: 1-2MB, prod: 4-16MB)
       - "postgres"
       - "-c"
-      - "max_connections=200"
+      - "max_connections=200"                    # Maximum concurrent connections
       - "-c"
-      - "shared_buffers=256MB"
+      - "shared_buffers=256MB"                   # Memory for caching data (25% of RAM)
       - "-c"
-      - "effective_cache_size=1GB"
+      - "effective_cache_size=1GB"               # OS + PostgreSQL cache estimate (50-75% of RAM)
       - "-c"
-      - "maintenance_work_mem=64MB"
+      - "maintenance_work_mem=64MB"              # Memory for maintenance operations (VACUUM, CREATE INDEX)
       - "-c"
-      - "checkpoint_completion_target=0.9"
+      - "checkpoint_completion_target=0.9"       # Spread checkpoint writes over 90% of checkpoint interval
       - "-c"
-      - "wal_buffers=16MB"
+      - "wal_buffers=16MB"                       # Write-ahead log buffer (-1 for auto-tuning)
       - "-c"
-      - "default_statistics_target=100"
+      - "default_statistics_target=100"          # Query planner statistics detail level
       - "-c"
-      - "random_page_cost=1.1"
+      - "random_page_cost=1.1"                   # SSD-optimized (HDD: 4.0)
       - "-c"
-      - "effective_io_concurrency=200"
+      - "effective_io_concurrency=200"           # Concurrent I/O operations (SSD: 200, HDD: 2)
       - "-c"
-      - "work_mem=1310kB"
+      - "work_mem=1310kB"                        # Memory per query operation (sort, hash)
       - "-c"
-      - "min_wal_size=1GB"
+      - "min_wal_size=1GB"                       # Minimum WAL size to keep
       - "-c"
-      - "max_wal_size=4GB"
+      - "max_wal_size=4GB"                       # Maximum WAL size before checkpoint trigger
 
   # pgAdmin (Optional - Database Management UI)
   pgadmin:
@@ -66,8 +77,9 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+      # Set to 'True' for non-local environments to enhance security
+      PGADMIN_CONFIG_SERVER_MODE: ${PGADMIN_SERVER_MODE:-False}
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: ${PGADMIN_MASTER_PASSWORD_REQUIRED:-False}
     ports:
       - "${PGADMIN_PORT:-5050}:80"
     volumes:

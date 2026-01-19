@@ -1,23 +1,19 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
 // Create connection pool for Prisma 7.x
-const connectionString = process.env.DATABASE_URL;
+const connectionString: string | undefined = process.env.DATABASE_URL;
 if (!connectionString) {
   throw new Error('DATABASE_URL is not defined');
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
+const pool: Pool = new Pool({ connectionString });
+const adapter: PrismaPg = new PrismaPg(pool);
 
 // Initialize Prisma Client with adapter
-const prisma = new PrismaClient({ adapter });
+const prisma: PrismaClient = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Start seeding...');

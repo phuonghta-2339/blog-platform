@@ -20,6 +20,49 @@ interface ErrorResponse {
   method: string;
 }
 
+/**
+ * Sanitize URL path to prevent sensitive data leakage
+ * - Removes query parameters (may contain tokens, passwords, etc.)
+ * - Masks numeric IDs and UUIDs in path segments
+ * - Masks common sensitive patterns
+ */
+function sanitizePath(url: string): string {
+  try {
+    // Remove query parameters and hash fragments
+    const pathOnly = url.split('?')[0].split('#')[0];
+
+    // Mask numeric IDs (e.g., /users/123 -> /users/:id)
+    let sanitized = pathOnly.replace(/\/\d+/g, '/:id');
+
+    // Mask UUIDs (e.g., /users/550e8400-e29b-41d4-a716-446655440000 -> /users/:uuid)
+    sanitized = sanitized.replace(
+      /\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+      '/:uuid',
+    );
+
+    // Mask common sensitive patterns
+    const sensitivePatterns = [
+      /\/token\/[^/]+/gi,
+      /\/reset-password\/[^/]+/gi,
+      /\/verify\/[^/]+/gi,
+      /\/activation\/[^/]+/gi,
+      /\/secret\/[^/]+/gi,
+    ];
+
+    sensitivePatterns.forEach((pattern) => {
+      sanitized = sanitized.replace(pattern, (match) => {
+        const parts = match.split('/');
+        return `/${parts[1]}/:masked`;
+      });
+    });
+
+    return sanitized;
+  } catch {
+    // Fallback to a generic path if parsing fails
+    return '/[sanitized]';
+  }
+}
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name);
@@ -37,7 +80,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message: 'An unexpected error occurred',
       },
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path: sanitizePath(request.url),
       method: request.method,
     };
 

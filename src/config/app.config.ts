@@ -23,8 +23,12 @@ export default registerAs(
     corsOrigin: process.env.CORS_ORIGIN?.split(',').map((origin) =>
       origin.trim(),
     ) || ['http://localhost:3000'],
-    corsMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    corsAllowedHeaders: ['Content-Type', 'Authorization'],
+    corsMethods: process.env.CORS_METHODS?.split(',').map((method) =>
+      method.trim(),
+    ) || ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    corsAllowedHeaders: process.env.CORS_HEADERS?.split(',').map((header) =>
+      header.trim(),
+    ) || ['Content-Type', 'Authorization'],
     logLevel: process.env.LOG_LEVEL || 'info',
   }),
 );

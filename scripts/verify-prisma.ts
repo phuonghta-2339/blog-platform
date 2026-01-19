@@ -5,10 +5,6 @@
  * Tests that Prisma Client imports work correctly at runtime
  */
 
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-
 import { PrismaClient, Prisma } from '@prisma/client';
 
 console.log('🔍 Testing Prisma Client imports...\n');
@@ -28,7 +24,7 @@ console.log(`   Has validator: ${!!Prisma.validator}\n`);
 // Test 3: Create PrismaClient instance
 try {
   // Prisma 7 uses adapter pattern, but we can still instantiate for testing
-  const prisma = new PrismaClient();
+  const prisma: PrismaClient = new PrismaClient();
   console.log('✅ Test 3: PrismaClient instance created successfully');
   console.log(`   Has $connect: ${typeof prisma.$connect === 'function'}`);
   console.log(
@@ -38,7 +34,7 @@ try {
   console.log(`   Has tag model: ${typeof prisma.tag === 'object'}\n`);
 
   // Clean up
-  prisma.$disconnect().catch(() => {
+  void prisma.$disconnect().catch(() => {
     // Ignore disconnect errors in test
   });
 } catch (error) {
@@ -51,7 +47,7 @@ try {
 
 // Test 4: Error types
 console.log('✅ Test 4: Prisma error types available');
-const errorTypes = [
+const errorTypes: string[] = [
   'PrismaClientKnownRequestError',
   'PrismaClientUnknownRequestError',
   'PrismaClientRustPanicError',
@@ -60,7 +56,7 @@ const errorTypes = [
 ];
 
 errorTypes.forEach((errorType) => {
-  const hasError = !!(Prisma as { [key: string]: unknown })[errorType];
+  const hasError = !!(Prisma as Record<string, unknown>)[errorType];
   console.log(`   ${errorType}: ${hasError ? '✓' : '✗'}`);
 });
 
