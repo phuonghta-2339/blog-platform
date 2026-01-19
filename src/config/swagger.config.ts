@@ -31,7 +31,7 @@ export function setupSwagger(app: INestApplication): void {
         description: 'Enter JWT token',
         in: 'header',
       },
-      'JWT-auth',
+      'bearer',
     )
     .addServer('http://localhost:3000', 'Local Development')
     .build();
@@ -79,7 +79,7 @@ export function setupSwagger(app: INestApplication): void {
         description: 'Enter JWT token',
         in: 'header',
       },
-      'JWT-auth',
+      'bearer',
     )
     .addServer('http://localhost:3000', 'Local Development')
     .build();

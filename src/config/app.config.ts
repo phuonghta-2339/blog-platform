@@ -11,6 +11,8 @@ export interface AppConfig {
   corsMethods: string[];
   corsAllowedHeaders: string[];
   logLevel: string;
+  jwtSecret: string;
+  jwtExpiresIn: string;
 }
 
 export default registerAs(
@@ -32,5 +34,7 @@ export default registerAs(
       header.trim(),
     ) || ['Content-Type', 'Authorization'],
     logLevel: process.env.LOG_LEVEL || 'info',
+    jwtSecret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   }),
 );
