@@ -1,7 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
-  ApiBearerAuth,
   ApiBody,
   ApiCreatedResponse,
   ApiOkResponse,
@@ -12,6 +11,7 @@ import {
 import { AuthResponseDto } from '../dto/auth-response.dto';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenResponseDto } from '../dto/refresh-token-response.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { RegisterDto } from '../dto/register.dto';
 
 export const ApiRegister = (): MethodDecorator & ClassDecorator => {
@@ -157,17 +157,21 @@ export const ApiRefreshToken = (): MethodDecorator & ClassDecorator => {
     ApiOperation({
       summary: 'Refresh JWT access token',
       description:
-        'Generates a new JWT token using the current valid token. Requires authentication.',
+        'Generates new access and refresh tokens using a valid refresh token provided in the request body.',
     }),
-    ApiBearerAuth(),
+    ApiBody({
+      type: RefreshTokenDto,
+      description: 'Refresh token to exchange for new tokens',
+    }),
     ApiOkResponse({
-      description: 'Token successfully refreshed',
+      description: 'Tokens successfully refreshed',
       type: RefreshTokenResponseDto,
       schema: {
         example: {
           success: true,
           data: {
             token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+            refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
           },
         },
       },

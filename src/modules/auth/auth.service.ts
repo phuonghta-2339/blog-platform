@@ -119,19 +119,36 @@ export class AuthService {
   }
 
   /**
-   * Generate new JWT tokens for authenticated user using refresh token
-   * User validation is already performed by JwtRefreshStrategy
-   * @param userId - ID of the authenticated user (already validated by JwtRefreshStrategy)
+   * Generate new JWT tokens using a valid refresh token
+   * Validates the refresh token and generates new access and refresh tokens
+   * @param refreshToken - The refresh token from request body
    * @returns New JWT access token and refresh token
-   * @throws UnauthorizedException if user not found or inactive
+   * @throws UnauthorizedException if refresh token is invalid, expired, or user is inactive
    */
   async refresh(
-    userId: number,
+    refreshToken: string,
   ): Promise<{ token: string; refreshToken: string }> {
-    // Get latest user data
-    // JwtRefreshStrategy has already validated user exists and is active
+    // Verify and decode refresh token
+    let payload: JwtPayload;
+    const refreshSecret = this.configService.get<string>(
+      'app.jwtRefreshSecret',
+    );
+
+    if (!refreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET is not configured');
+    }
+
+    try {
+      payload = this.jwtService.verify<JwtPayload>(refreshToken, {
+        secret: refreshSecret,
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    // Get latest user data to ensure user still exists and is active
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+      where: { id: payload.sub },
       select: {
         id: true,
         email: true,
@@ -146,14 +163,14 @@ export class AuthService {
     }
 
     if (!user.isActive) {
-      throw new UnauthorizedException('Account has been deactivated');
+      throw new UnauthorizedException('Your account has been deactivated');
     }
 
     // Generate new tokens
-    const token = this.generateToken(user);
-    const refreshToken = this.generateRefreshToken(user);
+    const newToken = this.generateToken(user);
+    const newRefreshToken = this.generateRefreshToken(user);
 
-    return { token, refreshToken };
+    return { token: newToken, refreshToken: newRefreshToken };
   }
 
   /**

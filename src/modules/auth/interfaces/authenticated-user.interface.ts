@@ -1,3 +1,5 @@
+import { Role } from '@prisma/client';
+
 /**
  * Authenticated User Interface
  * Represents the user object attached to requests after JWT authentication
@@ -7,5 +9,6 @@ export interface AuthenticatedUser {
   id: number;
   email: string;
   username: string;
-  role: string;
+  role: Role;
+  isActive: boolean;
 }
