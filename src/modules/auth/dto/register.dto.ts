@@ -8,6 +8,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Match } from '../decorators/match.decorator';
+import { PASSWORD_REGEX, USERNAME_REGEX } from '../constants/regex';
 
 /**
  * Data Transfer Object for user registration
@@ -32,7 +33,7 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Username is required' })
   @MinLength(3, { message: 'Username must be at least 3 characters' })
   @MaxLength(50, { message: 'Username must not exceed 50 characters' })
-  @Matches(/^[a-zA-Z0-9_]+$/, {
+  @Matches(USERNAME_REGEX, {
     message: 'Username can only contain letters, numbers, and underscores',
   })
   username!: string;
@@ -48,7 +49,7 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters' })
   @MaxLength(128, { message: 'Password must not exceed 128 characters' })
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+  @Matches(PASSWORD_REGEX, {
     message:
       'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number',
   })

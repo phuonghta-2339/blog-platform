@@ -6,7 +6,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
-import { comparePassword, hashPassword } from '@common/utils/hash.util';
+import { hash, compare } from 'bcrypt';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -38,8 +38,7 @@ export class AuthService {
 
     try {
       // Hash password
-      const hashedPassword = await hashPassword(password);
-
+      const hashedPassword = await hash(password, 10);
       // Create user
       user = await this.prisma.user.create({
         data: {
@@ -153,7 +152,7 @@ export class AuthService {
       throw new UnauthorizedException('Your account has been deactivated');
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
+    const isPasswordValid = await compare(password, user.password);
 
     if (!isPasswordValid) {
       return null;

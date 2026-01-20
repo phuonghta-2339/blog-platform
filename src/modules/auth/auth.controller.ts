@@ -24,16 +24,12 @@ import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
  * Handles authentication endpoints: register, login, and token refresh
  */
 @ApiTags('auth')
-@Controller({
-  path: 'auth',
-  version: '1',
-})
+@Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Public()
-  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
   @ApiRegister()
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(registerDto);
@@ -55,7 +51,6 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @UseGuards(JwtRefreshAuthGuard)
-  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
   @ApiRefreshToken()
   refresh(
     @Body() _refreshTokenDto: RefreshTokenDto, // Validated by DTO, extracted by strategy
