@@ -159,11 +159,13 @@ export const ApiRefreshToken = (): MethodDecorator & ClassDecorator => {
     ApiOperation({
       summary: 'Refresh JWT access token',
       description:
-        'Generates new access and refresh tokens using a valid refresh token provided in the request body.',
+        'Generates new access and refresh tokens using a valid refresh token provided in the request body. ' +
+        'Leverages Passport.js for automatic JWT verification while maintaining OAuth2 RFC 6749 compliance.',
     }),
     ApiBody({
       type: RefreshTokenDto,
-      description: 'Refresh token to exchange for new tokens',
+      description:
+        'Refresh token to exchange for new tokens. Token is validated by both DTO and Passport JWT strategy.',
     }),
     ApiOkResponse({
       description: 'Tokens successfully refreshed',

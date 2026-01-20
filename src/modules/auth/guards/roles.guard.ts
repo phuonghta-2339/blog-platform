@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Role } from '@prisma/client';
-import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { ROLES_KEY } from '../decorators/roles.decorator';
+import { AuthenticatedUser } from '@modules/auth/interfaces/authenticated-user.interface';
+import { IS_PUBLIC_KEY } from '@modules/auth/decorators/public.decorator';
+import { ROLES_KEY } from '@modules/auth/decorators/roles.decorator';
 
 interface RequestWithUser {
   user?: AuthenticatedUser;

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsJWT, IsNotEmpty, IsString } from 'class-validator';
 
 /**
  * Data Transfer Object for token refresh request
@@ -7,10 +7,13 @@ import { IsNotEmpty, IsString } from 'class-validator';
  */
 export class RefreshTokenDto {
   @ApiProperty({
-    description: 'Refresh token to exchange for new access token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    description: 'JWT refresh token obtained from login or register endpoint',
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSIsImlhdCI6MTYzNzMwNDAwMCwiZXhwIjoxNjM3OTA4ODAwfQ.signature',
+    minLength: 10,
   })
   @IsString({ message: 'Refresh token must be a string' })
   @IsNotEmpty({ message: 'Refresh token is required' })
+  @IsJWT({ message: 'Refresh token must be a valid JWT' })
   refreshToken!: string;
 }

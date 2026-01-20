@@ -3,20 +3,21 @@ import { ApiProperty } from '@nestjs/swagger';
 /**
  * User data included in authentication responses
  */
-class UserDto {
+export class UserDto {
   @ApiProperty({ description: 'User ID', example: 1 })
   id!: number;
 
   @ApiProperty({ description: 'User email', example: 'user@example.com' })
   email!: string;
 
-  @ApiProperty({ description: 'Username', example: 'johndoe' })
+  @ApiProperty({ description: 'Unique username', example: 'johndoe' })
   username!: string;
 
   @ApiProperty({
     description: 'User bio',
     example: 'Software developer and writer',
     nullable: true,
+    required: false,
   })
   bio!: string | null;
 
@@ -24,6 +25,7 @@ class UserDto {
     description: 'Avatar URL',
     example: 'https://example.com/avatars/johndoe.jpg',
     nullable: true,
+    required: false,
   })
   avatar!: string | null;
 
@@ -35,8 +37,9 @@ class UserDto {
   role!: string;
 
   @ApiProperty({
-    description: 'Account creation date',
+    description: 'Account creation timestamp',
     example: '2026-01-14T10:30:00.000Z',
+    type: String,
   })
   createdAt!: Date;
 }

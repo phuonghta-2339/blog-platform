@@ -6,8 +6,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
-import { comparePassword, hashPassword } from '../../common/utils/hash.util';
-import { PrismaService } from '../../database/prisma.service';
+import { comparePassword, hashPassword } from '@common/utils/hash.util';
+import { PrismaService } from '@/database/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -119,53 +119,13 @@ export class AuthService {
   }
 
   /**
-   * Generate new JWT tokens using a valid refresh token
-   * Validates the refresh token and generates new access and refresh tokens
-   * @param refreshToken - The refresh token from request body
+   * Generate new JWT tokens for authenticated user
+   * User validation is performed by JwtRefreshStrategy (JWT verification + DB query + status check)
+   *
+   * @param user - Validated user object from JwtRefreshStrategy
    * @returns New JWT access token and refresh token
-   * @throws UnauthorizedException if refresh token is invalid, expired, or user is inactive
    */
-  async refresh(
-    refreshToken: string,
-  ): Promise<{ token: string; refreshToken: string }> {
-    // Verify and decode refresh token
-    let payload: JwtPayload;
-    const refreshSecret = this.configService.get<string>(
-      'app.jwtRefreshSecret',
-    );
-
-    if (!refreshSecret) {
-      throw new Error('JWT_REFRESH_SECRET is not configured');
-    }
-
-    try {
-      payload = this.jwtService.verify<JwtPayload>(refreshToken, {
-        secret: refreshSecret,
-      });
-    } catch {
-      throw new UnauthorizedException('Invalid or expired refresh token');
-    }
-
-    // Get latest user data to ensure user still exists and is active
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Your account has been deactivated');
-    }
-
+  refresh(user: UserForToken): { token: string; refreshToken: string } {
     // Generate new tokens
     const newToken = this.generateToken(user);
     const newRefreshToken = this.generateRefreshToken(user);

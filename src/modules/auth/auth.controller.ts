@@ -8,13 +8,16 @@ import {
   ApiRefreshToken,
   ApiRegister,
 } from './decorators/api-auth.decorator';
+import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { JwtRefreshAuthGuard } from './guards/jwt-refresh-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 
 /**
  * Auth Controller
@@ -51,12 +54,14 @@ export class AuthController {
 
   @Post('refresh')
   @Public()
+  @UseGuards(JwtRefreshAuthGuard)
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
   @ApiRefreshToken()
-  async refresh(
-    @Body() refreshTokenDto: RefreshTokenDto,
-  ): Promise<RefreshTokenResponseDto> {
-    // Validate refresh token and generate new tokens
-    return this.authService.refresh(refreshTokenDto.refreshToken);
+  refresh(
+    @Body() _refreshTokenDto: RefreshTokenDto, // Validated by DTO, extracted by strategy
+    @CurrentUser() user: AuthenticatedUser, // Populated by JwtRefreshStrategy
+  ): RefreshTokenResponseDto {
+    // User already validated by JwtRefreshStrategy:
+    return this.authService.refresh(user);
   }
 }
