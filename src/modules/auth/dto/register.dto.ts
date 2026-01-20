@@ -39,13 +39,15 @@ export class RegisterDto {
 
   @ApiProperty({
     description:
-      'Password (min 8 characters, at least 1 uppercase, 1 lowercase, 1 number)',
+      'Password (8-128 characters, at least 1 uppercase, 1 lowercase, 1 number)',
     example: 'SecurePass123!',
     minLength: 8,
+    maxLength: 128,
   })
   @IsString()
   @IsNotEmpty({ message: 'Password is required' })
   @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @MaxLength(128, { message: 'Password must not exceed 128 characters' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message:
       'Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 number',

@@ -75,6 +75,9 @@ DB_PORT=5432
 
 # JWT Secret (MUST change in production!)
 JWT_SECRET="your-super-secret-jwt-key-min-32-characters"
+
+# JWT Refresh Secret (MUST change in production!)
+JWT_REFRESH_SECRET="your-super-secret-refresh-token-key-min-32-characters"
 ```
 
 #### 4. Start PostgreSQL with Docker

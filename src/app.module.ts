@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { appConfig, databaseConfig, AppConfigService } from './config';
 import { configValidationSchema } from './config/validation.schema';
 import { V1Module } from './v1';
+import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 
@@ -38,6 +39,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard';
       },
     ]),
     DatabaseModule,
+    AuthModule,
     V1Module,
   ],
   controllers: [AppController],

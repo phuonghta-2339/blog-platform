@@ -2,20 +2,21 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { PrismaService } from '../../../database/prisma.service';
+import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
 
 /**
  * JWT Authentication Strategy
  * Validates JWT tokens and attaches user data to the request
- * Checks if user exists and is active before granting access
+ *
+ * PERFORMANCE OPTIMIZATION:
+ * This strategy validates users from the JWT payload WITHOUT database queries.
+ * The isActive status is included in the JWT payload to avoid DB lookups on every request.
+ * Used by JwtAuthGuard for protecting routes with JWT authentication
  */
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     const jwtSecret = configService.get<string>('app.jwtSecret');
 
     if (!jwtSecret) {
@@ -31,37 +32,28 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<{
-    id: number;
-    email: string;
-    username: string;
-    role: string;
-  }> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        role: true,
-        isActive: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Your account has been deactivated');
+  /**
+   * Validate JWT payload and extract user information
+   * This method is called on every authenticated request
+   *
+   * @param payload - Decoded JWT payload containing user information
+   * @returns User object attached to request.user
+   * @throws UnauthorizedException if account is deactivated
+   */
+  validate(payload: JwtPayload): AuthenticatedUser {
+    // Validate account status from payload (no DB query)
+    if (!payload.isActive) {
+      throw new UnauthorizedException(
+        'Your account has been deactivated. Please contact support.',
+      );
     }
 
     // Return user object that will be attached to request.user
     return {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
+      id: payload.sub,
+      email: payload.email,
+      username: payload.username,
+      role: payload.role,
     };
   }
 }

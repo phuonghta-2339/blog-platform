@@ -43,7 +43,7 @@ class UserDto {
 
 /**
  * Response DTO for authentication operations (register, login)
- * Contains user data and JWT token
+ * Contains user data, JWT access token, and refresh token
  */
 export class AuthResponseDto {
   @ApiProperty({ description: 'User data', type: UserDto })
@@ -54,4 +54,10 @@ export class AuthResponseDto {
     example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   token!: string;
+
+  @ApiProperty({
+    description: 'JWT refresh token',
+    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+  })
+  refreshToken!: string;
 }

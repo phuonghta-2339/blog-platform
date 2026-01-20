@@ -1,13 +1,17 @@
 import * as bcrypt from 'bcrypt';
 
 /**
- * Hash a password using bcrypt with cost factor 10
+ * Default bcrypt salt rounds for password hashing
+ */
+const SALT_ROUNDS = 10;
+
+/**
+ * Hash a password using bcrypt with configurable cost factor
  * @param password - Plain text password to hash
  * @returns Hashed password
  */
 export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 10;
-  return bcrypt.hash(password, saltRounds);
+  return bcrypt.hash(password, SALT_ROUNDS);
 }
 
 /**

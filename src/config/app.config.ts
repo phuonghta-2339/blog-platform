@@ -13,16 +13,26 @@ export interface AppConfig {
   logLevel: string;
   jwtSecret: string;
   jwtExpiresIn: string;
+  jwtRefreshSecret: string;
+  jwtRefreshExpiresIn: string;
 }
 
 export default registerAs('app', (): AppConfig => {
   const env = process.env.NODE_ENV || 'development';
   const jwtSecret = process.env.JWT_SECRET;
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
 
   // Fail fast if JWT_SECRET is missing
   if (!jwtSecret) {
     throw new Error(
       'FATAL: JWT_SECRET is required but not set in environment variables.',
+    );
+  }
+
+  // Fail fast if JWT_REFRESH_SECRET is missing
+  if (!jwtRefreshSecret) {
+    throw new Error(
+      'FATAL: JWT_REFRESH_SECRET is required but not set in environment variables.',
     );
   }
 
@@ -43,7 +53,9 @@ export default registerAs('app', (): AppConfig => {
       header.trim(),
     ) || ['Content-Type', 'Authorization'],
     logLevel: process.env.LOG_LEVEL || 'info',
-    jwtSecret: jwtSecret || 'your-secret-key-change-in-production',
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    jwtSecret: jwtSecret,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+    jwtRefreshSecret: jwtRefreshSecret,
+    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
   };
 });

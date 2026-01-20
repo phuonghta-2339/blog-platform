@@ -11,9 +11,12 @@ import {
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { AuthResponseDto } from './dto/auth-response.dto';
+import { LoginDto } from './dto/login.dto';
 import { RefreshTokenResponseDto } from './dto/refresh-token-response.dto';
 import { RegisterDto } from './dto/register.dto';
+import { JwtRefreshAuthGuard } from './guards/jwt-refresh-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
+import { AuthenticatedUser } from './interfaces/authenticated-user.interface';
 
 /**
  * Auth Controller
@@ -40,16 +43,23 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute
   @ApiLogin()
-  login(@Request() req: { user: User }): AuthResponseDto {
+  login(
+    @Body() _loginDto: LoginDto, // Validated by DTOs, used by LocalAuthGuard
+    @Request() req: { user: User },
+  ): AuthResponseDto {
+    // User is already validated by LocalAuthGuard and LocalStrategy
     return this.authService.login(req.user);
   }
 
   @Post('refresh')
+  @Public()
+  @UseGuards(JwtRefreshAuthGuard)
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
   @ApiRefreshToken()
   async refresh(
-    @CurrentUser() user: { id: number },
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<RefreshTokenResponseDto> {
+    // User is already validated by JwtRefreshAuthGuard and JwtRefreshStrategy
     return this.authService.refresh(user.id);
   }
 }

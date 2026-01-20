@@ -5,12 +5,13 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { Prisma, User } from '@prisma/client';
 import { comparePassword, hashPassword } from '../../common/utils/hash.util';
 import { PrismaService } from '../../database/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { UserForToken } from './interfaces/user-for-token.interface';
 
 /**
  * Authentication Service
@@ -33,53 +34,70 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const { email, username, password } = registerDto;
 
-    // Check if email already exists
-    const existingUserByEmail = await this.prisma.user.findUnique({
-      where: { email },
-    });
+    let user: User;
 
-    if (existingUserByEmail) {
-      throw new BadRequestException('Email already registered');
+    try {
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+
+      // Create user
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          username,
+          password: hashedPassword,
+          role: 'USER',
+          isActive: true,
+        },
+      });
+    } catch (error) {
+      // Handle unique constraint violations
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        // Get the field that caused the unique constraint violation
+        const target = error.meta?.target as string[] | undefined;
+
+        if (target?.includes('email')) {
+          throw new BadRequestException('Email already registered');
+        }
+
+        if (target?.includes('username')) {
+          throw new BadRequestException('Username already taken');
+        }
+
+        // Fallback for unknown unique constraint
+        throw new BadRequestException('Registration failed: duplicate entry');
+      }
+
+      // Re-throw other errors
+      throw error;
     }
 
-    // Check if username already exists
-    const existingUserByUsername = await this.prisma.user.findUnique({
-      where: { username },
-    });
+    // Generate JWT tokens AFTER user creation succeeds
+    // If token generation fails, user exists but can login again
+    // This is acceptable as token generation rarely fails and user data is preserved
+    try {
+      const token = this.generateToken(user);
+      const refreshToken = this.generateRefreshToken(user);
 
-    if (existingUserByUsername) {
-      throw new BadRequestException('Username already taken');
+      return {
+        user: this.mapUserToDto(user),
+        token,
+        refreshToken,
+      };
+    } catch (tokenError) {
+      // Log token generation failure for monitoring
+      console.error(
+        'Token generation failed after user creation:',
+        tokenError instanceof Error ? tokenError.message : String(tokenError),
+      );
+
+      throw new BadRequestException(
+        'Account created successfully but token generation failed. Please try logging in.',
+      );
     }
-
-    // Hash password
-    const hashedPassword = await hashPassword(password);
-
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        username,
-        password: hashedPassword,
-        role: 'USER',
-        isActive: true,
-      },
-    });
-
-    // Generate JWT token
-    const token = this.generateToken(user);
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        bio: user.bio,
-        avatar: user.avatar,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
-      token,
-    };
   }
 
   /**
@@ -89,33 +107,38 @@ export class AuthService {
    * @returns User data and JWT token
    */
   login(user: User): AuthResponseDto {
-    // Generate JWT token
+    // Generate JWT tokens
     const token = this.generateToken(user);
+    const refreshToken = this.generateRefreshToken(user);
 
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        bio: user.bio,
-        avatar: user.avatar,
-        role: user.role,
-        createdAt: user.createdAt,
-      },
+      user: this.mapUserToDto(user),
       token,
+      refreshToken,
     };
   }
 
   /**
-   * Generate a new JWT token for authenticated user
-   * @param userId - ID of the authenticated user
-   * @returns New JWT access token
+   * Generate new JWT tokens for authenticated user using refresh token
+   * User validation is already performed by JwtRefreshStrategy
+   * @param userId - ID of the authenticated user (already validated by JwtRefreshStrategy)
+   * @returns New JWT access token and refresh token
    * @throws UnauthorizedException if user not found or inactive
    */
-  async refresh(userId: number): Promise<{ token: string }> {
-    // Get user
+  async refresh(
+    userId: number,
+  ): Promise<{ token: string; refreshToken: string }> {
+    // Get latest user data
+    // JwtRefreshStrategy has already validated user exists and is active
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        role: true,
+        isActive: true,
+      },
     });
 
     if (!user) {
@@ -126,10 +149,11 @@ export class AuthService {
       throw new UnauthorizedException('Account has been deactivated');
     }
 
-    // Generate new token
+    // Generate new tokens
     const token = this.generateToken(user);
+    const refreshToken = this.generateRefreshToken(user);
 
-    return { token };
+    return { token, refreshToken };
   }
 
   /**
@@ -162,19 +186,73 @@ export class AuthService {
   }
 
   /**
-   * Generate JWT token from user data
-   * @param user - User object
-   * @returns Signed JWT token
+   * Map User entity to response DTO format
+   * Extracts only the fields needed for API responses
+   * @param user - User entity from database
+   * @returns User data for API response
    * @private
    */
-  private generateToken(user: User): string {
+  private mapUserToDto(user: User) {
+    return {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      bio: user.bio,
+      avatar: user.avatar,
+      role: user.role,
+      createdAt: user.createdAt,
+    };
+  }
+
+  /**
+   * Generate JWT access token from user data
+   * Includes user status in payload for stateless validation
+   * @param user - User object with essential fields for token
+   * @returns Signed JWT access token
+   * @private
+   */
+  private generateToken(user: UserForToken): string {
     const payload: JwtPayload = {
       sub: user.id,
       email: user.email,
       username: user.username,
       role: user.role,
+      isActive: user.isActive,
     };
 
     return this.jwtService.sign(payload);
+  }
+
+  /**
+   * Generate JWT refresh token from user data
+   * Includes user status in payload for stateless validation
+   * @param user - User object with essential fields for token
+   * @returns Signed JWT refresh token with longer expiration
+   * @private
+   */
+  private generateRefreshToken(user: UserForToken): string {
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      isActive: user.isActive,
+    };
+
+    const refreshSecret = this.configService.get<string>(
+      'app.jwtRefreshSecret',
+    );
+
+    if (!refreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET is not configured');
+    }
+
+    const refreshExpiresIn =
+      this.configService.get<string>('app.jwtRefreshExpiresIn') || '7d';
+
+    return this.jwtService.sign(payload as Record<string, unknown>, {
+      secret: refreshSecret,
+      expiresIn: refreshExpiresIn as string & number,
+    });
   }
 }
