@@ -222,6 +222,23 @@ export class AuthService {
   }
 
   /**
+   * Create JWT payload from user data
+   * Centralizes payload structure for both access and refresh tokens
+   * @param user - User object with essential fields for token
+   * @returns JWT payload object
+   * @private
+   */
+  private createJwtPayload(user: UserForToken): JwtPayload {
+    return {
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+      role: user.role,
+      isActive: user.isActive,
+    };
+  }
+
+  /**
    * Generate JWT access token from user data
    * Includes user status in payload for stateless validation
    * @param user - User object with essential fields for token
@@ -229,14 +246,7 @@ export class AuthService {
    * @private
    */
   private generateToken(user: UserForToken): string {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      isActive: user.isActive,
-    };
-
+    const payload = this.createJwtPayload(user);
     return this.jwtService.sign(payload);
   }
 
@@ -248,13 +258,7 @@ export class AuthService {
    * @private
    */
   private generateRefreshToken(user: UserForToken): string {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      username: user.username,
-      role: user.role,
-      isActive: user.isActive,
-    };
+    const payload = this.createJwtPayload(user);
 
     const refreshSecret = this.configService.get<string>(
       'app.jwtRefreshSecret',
