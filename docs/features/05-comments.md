@@ -46,14 +46,49 @@ Implement CR-D operations for comments (no update by design) with article linkin
 ## 🏗️ Module Structure
 
 ```text
-src/modules/comments/
-├── dto/
-│   ├── create-comment.dto.ts
-│   ├── comment-response.dto.ts
-│   └── comment-query.dto.ts
-├── comments.controller.ts
-├── comments.service.ts
-└── comments.module.ts
+src/
+├── common/
+│   ├── cache/
+│   │   ├── cache.config.ts             # CacheKeys patterns
+│   │   └── cache.module.ts             # Global cache (no local imports needed)
+│   └── constants/
+│       └── cache.ts                    # CACHE_TTL constants
+└── modules/comments/
+    ├── dto/
+    │   ├── create-comment.dto.ts
+    │   ├── comment-response.dto.ts
+    │   └── comment-query.dto.ts
+    ├── guards/
+    │   └── comment-author.guard.ts     # For delete authorization
+    ├── comments.controller.ts
+    ├── comments.service.ts
+    └── comments.module.ts
+```
+
+**Note:**
+
+- No barrel exports (index.ts) - import directly from files
+- CacheModule is Global - no local imports needed
+- CommentsModule imports DatabaseModule and ArticlesModule only
+
+### Import Path Conventions
+
+**Absolute Paths** (cross-module imports):
+
+```typescript
+// From comments module importing from other modules
+import { CurrentUser } from '@modules/auth/decorators/current-user.decorator';
+import { Public } from '@modules/auth/decorators/public.decorator';
+import { ArticlesService } from '@modules/articles/articles.service';
+```
+
+**Relative Paths** (within same module):
+
+```typescript
+// Within comments module
+import { CreateCommentDto } from './dto/create-comment.dto';
+import { CommentsService } from './comments.service';
+import { CommentAuthorGuard } from './guards/comment-author.guard';
 ```
 
 ---
@@ -68,19 +103,44 @@ src/modules/comments/
 
 ### 2. Comments Service
 
-- create: with article existence check, increment count in transaction
-- findAll: paginated list with author eager loading
-- findOne: single comment retrieval
-- delete: with authorization check, decrement count in transaction
-- mapToResponse: include following status for current user
+**Core Methods:**
+
+- `create()`: Transaction (comment + increment article.commentsCount)
+- `findAll()`: Paginated list with eager-loaded author
+- `findOne()`: Single comment with author
+- `delete()`: Transaction (delete + decrement article.commentsCount)
+
+**Key Points:**
+
+- Verify article published before create
+- Authorization check (author OR admin)
+- No update operation (immutable by design)
+- Optional caching: CACHE_TTL.SHORT (60s) for lists
+
+### 2.1. Caching Strategy (Optional)
+
+**Implementation:**
+
+- Inject CACHE_MANAGER (global, no local import)
+- Cache key: `comments:article:${articleId}:${page}`
+- TTL: CACHE_TTL.SHORT (60s) - frequently updated
+- Invalidate after create/delete
+- Cache only for high-traffic articles
 
 ### 3. Comments Controller
 
-- POST /articles/:slug/comments: create comment
-- GET /articles/:slug/comments: list with pagination (public)
-- GET /articles/:slug/comments/:id: single comment (public)
-- DELETE /articles/:slug/comments/:id: delete with auth check
-- Nested routes under articles
+**Endpoints:**
+
+- POST /articles/:slug/comments - Create (authenticated)
+- GET /articles/:slug/comments - List (public with @Public())
+- GET /articles/:slug/comments/:id - Single comment (public)
+- DELETE /articles/:slug/comments/:id - Delete (CommentAuthorGuard)
+
+**Configuration:**
+
+- @ApiTags('comments'), @Controller('articles/:slug/comments')
+- Nested route under articles
+- Use @CurrentUser() for authenticated requests
 
 ---
 
@@ -105,11 +165,45 @@ src/modules/comments/
 
 ## 📚 Production Best Practices
 
-**Transaction Safety:** Create/delete use transactions for count updates
-**No Update:** Transparency - comments are immutable once created
-**Authorization:** Owner or admin checks for deletion
-**Pagination:** Required to prevent unbounded queries
-**Error Handling:** NotFoundException, ForbiddenException
+**Transaction Safety:**
+
+- All count updates wrapped in Prisma transactions
+- Atomic operations: comment + article.commentsCount together
+- Rollback on any failure ensures data consistency
+- Use `prisma.$transaction()` for all create/delete operations
+
+**No Update Operation:**
+
+- Transparency by design - comments are immutable
+- Only create and delete allowed
+- Builds trust and accountability
+
+**Authorization:**
+
+- CommentAuthorGuard verifies ownership
+- Author OR admin can delete
+- ForbiddenException for unauthorized attempts
+
+**Pagination:**
+
+- Required for all list endpoints
+- Default 20 per page
+- Prevents unbounded queries
+- Include metadata (total, pages)
+
+**Error Handling:**
+
+- NotFoundException for invalid article/comment ID
+- ForbiddenException for unauthorized delete
+- BadRequestException for validation errors
+- Proper HTTP status codes
+
+**Performance:**
+
+- Eager load author to avoid N+1 queries
+- Index on (articleId, createdAt) for efficient pagination
+- Select only needed fields
+- Optional caching for high-traffic articles
 
 ---
 

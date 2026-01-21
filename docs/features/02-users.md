@@ -49,16 +49,51 @@ Implement CRU operations for user profile management with custom decorators for 
 ```text
 src/
 ├── common/
-│   └── decorators/
+│   ├── cache/
+│   │   ├── cache.config.ts             # CacheKeys patterns
+│   │   └── cache.module.ts             # Global cache (no local imports needed)
+│   ├── constants/
+│   │   └── cache.ts                    # CACHE_TTL constants (SHORT, MEDIUM, etc.)
+│   └── decorators/                     # Already exists from auth module
 │       ├── current-user.decorator.ts   # Extract authenticated user
 │       ├── public.decorator.ts         # Mark public routes
 │       └── roles.decorator.ts          # Role-based access
 └── modules/
     └── users/
         ├── dto/                        # Update, response DTOs
-        ├── users.controller.ts
+        │   ├── update-user.dto.ts
+        │   ├── user-response.dto.ts
+        │   └── public-profile.dto.ts
+        ├── users.controller.ts         # /user endpoints (authenticated)
+        ├── profiles.controller.ts      # /profiles/:username (public)
         ├── users.service.ts
         └── users.module.ts
+```
+
+**Note:**
+
+- No barrel exports (index.ts) - import directly from files
+- Two-controller pattern: UsersController + ProfilesController
+- CacheModule is Global - no local imports needed
+
+### Import Path Conventions
+
+**Absolute Paths** (cross-module imports):
+
+```typescript
+// From users module importing auth decorators
+import { CurrentUser } from '@modules/auth/decorators/current-user.decorator';
+import { Public } from '@modules/auth/decorators/public.decorator';
+import { Roles } from '@modules/auth/decorators/roles.decorator';
+```
+
+**Relative Paths** (within same module):
+
+```typescript
+// Within users module
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { UsersService } from './users.service';
 ```
 
 ---
@@ -80,19 +115,48 @@ src/
 
 ### 3. Users Service
 
-- getProfile: find user by ID, throw NotFoundException if not found
-- updateProfile: validate uniqueness, hash password if changed
-- getPublicProfile: find by username, include following status
-- findById/findByEmail/findByUsername: helper methods
+**Core Methods:**
+
+- `getProfile()`: Find user by ID, cache with CACHE_TTL.SHORT (60s)
+- `updateProfile()`: Validate uniqueness, hash password, invalidate caches
+- `getPublicProfile()`: Find by username, cache with CACHE_TTL.MEDIUM (5min)
+- Helper methods: findById, findByEmail, findByUsername
+
+**Key Implementation Points:**
+
+- CACHE_MANAGER injection (global, no local import)
+- Cache invalidation with old username handling
+- Prisma error handling (P2002 for unique constraints)
+- Two-controller pattern for separation of concerns
 
 ### 4. Users Controller
 
-- GET /user: current authenticated user profile
-- PUT /user: update current user profile
-- GET /profiles/:username: public profile view
-- Swagger documentation with examples
+**Two Controllers:**
 
-### 5. Avatar Upload (TODO)
+- **UsersController** (@Controller('user')): GET /user, PUT /user (authenticated)
+- **ProfilesController** (@Controller('profiles')): GET /profiles/:username (public with @Public())
+
+**Configuration:**
+
+- Use @ApiTags for Swagger grouping
+- No @Throttle() needed (global throttle)
+- @CurrentUser() decorator for authenticated requests
+
+### 5. Caching Strategy
+
+**Module Configuration:**
+
+- Import DatabaseModule only (CacheModule is global)
+- Export UsersService for other modules
+
+**Cache Implementation:**
+
+- Inject CACHE_MANAGER (no local import)
+- Authenticated profiles: CACHE_TTL.SHORT (60s)
+- Public profiles: CACHE_TTL.MEDIUM (5min) with CacheKeys.userProfile()
+- Invalidate on update with old username handling
+
+### 7. Avatar Upload (TODO)
 
 - S3 integration for image storage
 - Image validation and resizing
@@ -124,25 +188,22 @@ src/
 
 ### Performance
 
-- [ ] Public profiles cached (5 min TTL)
-- [ ] Username lookups use index
-- [ ] Batch following status checks
+- [ ] Public profiles cached with CACHE_TTL.MEDIUM (5 min)
+- [ ] Authenticated profiles cached with CACHE_TTL.SHORT (60s)
+- [ ] Username lookups use database index
+- [ ] Cache invalidation on profile update
 
 ---
 
 ## 📚 Production Best Practices
 
-**Security:** Password hashing, soft delete, input validation, username pattern
-
-**Architecture:** Custom decorators, service layer separation, DTO transformations
-
-**Validation:** Email format, username pattern, bio length, duplicate checks
-
-**Error Handling:** NotFoundException for missing users, ConflictException for duplicates
-
-**Performance:** Caching public profiles, indexed queries, batch checks
-
-**Documentation:** Swagger decorators, usage examples, TODO for future features
+- **Security**: Password hashing (bcrypt cost 10), soft delete with isActive, input validation, username pattern enforcement
+- **Architecture**: Two-controller pattern (UsersController + ProfilesController), service layer separation, DTO transformations with class-transformer, Global CacheModule (no local imports)
+- **Caching**: CACHE_TTL constants from `@/common/constants/cache`, CacheKeys patterns from `@/common/cache/cache.config`, cache invalidation on updates with old username handling
+- **Validation**: Email format validation, username pattern, bio length (max 500), duplicate checks with Prisma error handling (P2002)
+- **Error Handling**: NotFoundException for missing users, BadRequestException for validation errors, Prisma constraint errors with specific field identification
+- **Performance**: Global cache with CACHE_MANAGER injection, indexed queries on username, efficient DB queries with \_count aggregation
+- **Documentation**: Swagger decorators, usage examples with actual code patterns, TODO markers for future features (S3 avatar upload)
 
 ---
 
