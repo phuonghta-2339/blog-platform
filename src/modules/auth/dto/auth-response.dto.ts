@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { EXAMPLE_JWT_TOKEN } from '@common/constants/validation';
 
 /**
  * User data included in authentication responses
@@ -54,13 +55,13 @@ export class AuthResponseDto {
 
   @ApiProperty({
     description: 'JWT access token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    example: EXAMPLE_JWT_TOKEN,
   })
   token!: string;
 
   @ApiProperty({
     description: 'JWT refresh token',
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+    example: EXAMPLE_JWT_TOKEN,
   })
   refreshToken!: string;
 }

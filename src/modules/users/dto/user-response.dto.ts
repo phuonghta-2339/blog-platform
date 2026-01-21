@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Exclude, Expose } from 'class-transformer';
+import { DEFAULT_COUNT } from '@common/constants/validation';
 
 /**
  * DTO for user response
@@ -63,7 +64,7 @@ export class UserResponseDto {
     description: 'Number of followers',
     example: 150,
     type: Number,
-    default: 0,
+    default: DEFAULT_COUNT,
   })
   @Expose()
   followersCount!: number;
@@ -72,7 +73,7 @@ export class UserResponseDto {
     description: 'Number of users following',
     example: 75,
     type: Number,
-    default: 0,
+    default: DEFAULT_COUNT,
   })
   @Expose()
   followingCount!: number;
@@ -81,7 +82,7 @@ export class UserResponseDto {
     description: 'Number of articles written',
     example: 25,
     type: Number,
-    default: 0,
+    default: DEFAULT_COUNT,
   })
   @Expose()
   articlesCount!: number;

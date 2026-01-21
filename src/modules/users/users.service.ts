@@ -16,6 +16,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PublicProfileDto } from './dto/public-profile.dto';
 import { CACHE_TTL } from '@/common/constants/cache';
+import { BCRYPT_SALT_ROUNDS } from './constants/users';
 
 /**
  * Users Service
@@ -160,7 +161,7 @@ export class UsersService {
 
     // Hash password if provided
     if (password) {
-      data.password = await hash(password, 10);
+      data.password = await hash(password, BCRYPT_SALT_ROUNDS);
     }
 
     try {

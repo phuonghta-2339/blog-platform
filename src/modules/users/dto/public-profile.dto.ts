@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Exclude, Expose } from 'class-transformer';
+import {
+  DEFAULT_COUNT,
+  DEFAULT_FOLLOWING_STATUS,
+} from '@common/constants/validation';
 
 /**
  * DTO for public profile response
@@ -37,7 +41,7 @@ export class PublicProfileDto {
     description: 'Number of followers',
     example: 150,
     type: Number,
-    default: 0,
+    default: DEFAULT_COUNT,
   })
   @Expose()
   followersCount!: number;
@@ -46,7 +50,7 @@ export class PublicProfileDto {
     description: 'Number of articles written',
     example: 25,
     type: Number,
-    default: 0,
+    default: DEFAULT_COUNT,
   })
   @Expose()
   articlesCount!: number;
@@ -56,7 +60,7 @@ export class PublicProfileDto {
       'Whether the current user is following this profile (false if not authenticated)',
     example: false,
     type: Boolean,
-    default: false,
+    default: DEFAULT_FOLLOWING_STATUS,
   })
   @Expose()
   following!: boolean;

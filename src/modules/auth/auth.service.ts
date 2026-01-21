@@ -12,6 +12,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { UserForToken } from './interfaces/user-for-token.interface';
+import { BCRYPT_SALT_ROUNDS } from './constants/auth';
 
 /**
  * Authentication Service
@@ -38,7 +39,7 @@ export class AuthService {
 
     try {
       // Hash password
-      const hashedPassword = await hash(password, 10);
+      const hashedPassword = await hash(password, BCRYPT_SALT_ROUNDS);
       // Create user
       user = await this.prisma.user.create({
         data: {
