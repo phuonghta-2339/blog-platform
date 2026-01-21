@@ -16,6 +16,8 @@ Table users {
   role varchar(20) [not null, default: 'USER', note: 'ADMIN or USER']
   bio text [null]
   avatar varchar(1000) [null, note: 'URL to avatar image (CDN/S3), not binary data']
+  followers_count integer [default: 0, note: 'Optional denormalized count for performance']
+  following_count integer [default: 0, note: 'Optional denormalized count for performance']
   is_active boolean [default: true, note: 'Soft delete flag']
   created_at timestamp [default: `now()`]
   updated_at timestamp [default: `now()`]
@@ -65,6 +67,7 @@ Table tags {
   id integer [primary key, increment]
   name varchar(50) [unique, not null]
   slug varchar(50) [unique, not null]
+  articles_count integer [default: 0, note: 'Denormalized count for performance']
   created_at timestamp [default: `now()`]
 
   Indexes {
@@ -150,6 +153,8 @@ Table follows {
 - ✅ Password must be hashed (bcrypt/argon2)
 - ✅ Role: only ADMIN or USER
 - ✅ Avatar must be a valid URL (max 1000 chars) pointing to external storage (S3/CDN)
+- ✅ Optional denormalized counts (`followers_count`, `following_count`) for performance
+- ✅ Update counts in transaction when follow/unfollow occurs
 - ✅ Soft delete via `is_active` flag
 - ❌ No hard delete
 - ❌ Do not store binary image data in database
@@ -159,8 +164,10 @@ Table follows {
 - ✅ Slug must be unique and URL-friendly (auto-generate from title)
 - ✅ Author must exist (foreign key constraint)
 - ✅ Denormalized counts (`favorites_count`, `comments_count`) to optimize performance
+- ✅ Only published articles visible in public lists
+- ✅ Tag articlesCount only counts published articles
 - ✅ Cascade delete comments when article is deleted
-- ✅ `is_published` to support draft functionality
+- ✅ `is_published` supports draft functionality (false = draft, true = published)
 
 ### Comments Table
 
@@ -173,6 +180,8 @@ Table follows {
 - ✅ Seeded data only
 - ✅ No CRUD operations from users
 - ✅ Name and slug must be unique
+- ✅ Denormalized `articles_count` updated when articles created/deleted
+- ✅ Use transactions when updating article-tag relations to maintain count consistency
 
 ### Favorites Table
 
@@ -267,16 +276,18 @@ enum Role {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique @db.VarChar(255)
-  username  String   @unique @db.VarChar(100)
-  password  String   @db.VarChar(255)
-  role      Role     @default(USER)
-  bio       String?  @db.Text
-  avatar    String?  @db.VarChar(1000) // URL to avatar image on CDN/S3
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             Int      @id @default(autoincrement())
+  email          String   @unique @db.VarChar(255)
+  username       String   @unique @db.VarChar(100)
+  password       String   @db.VarChar(255)
+  role           Role     @default(USER)
+  bio            String?  @db.Text
+  avatar         String?  @db.VarChar(1000) // URL to avatar image on CDN/S3
+  followersCount Int      @default(0) @map("followers_count")
+  followingCount Int      @default(0) @map("following_count")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   articles   Article[]
   comments   Comment[]
@@ -331,10 +342,11 @@ model Comment {
 }
 
 model Tag {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique @db.VarChar(50)
-  slug      String   @unique @db.VarChar(50)
-  createdAt DateTime @default(now()) @map("created_at")
+  id            Int      @id @default(autoincrement())
+  name          String   @unique @db.VarChar(50)
+  slug          String   @unique @db.VarChar(50)
+  articlesCount Int      @default(0) @map("articles_count")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   articles ArticleTag[]
 

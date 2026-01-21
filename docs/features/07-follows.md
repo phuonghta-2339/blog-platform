@@ -17,8 +17,8 @@ Implement follow/unfollow operations with self-follow prevention, denormalized c
 
 - Follow user (POST /profiles/:username/follow) - authenticated
 - Unfollow user (DELETE /profiles/:username/follow) - authenticated
-- List followers (GET /profiles/:username/followers) - public with pagination
-- List following (GET /profiles/:username/following) - public with pagination
+- List followers (GET /profiles/:username/followers) - authenticated with pagination
+- List following (GET /profiles/:username/following) - authenticated with pagination
 - Cannot follow yourself (enforced at service level)
 - Idempotent operations (safe retries)
 
@@ -32,8 +32,8 @@ Implement follow/unfollow operations with self-follow prevention, denormalized c
 ### Authorization Rules
 
 - **USER:** Can follow/unfollow any user except self
-- **PUBLIC:** Can view followers/following lists
-- **Authenticated:** Required for follow/unfollow actions
+- **USER:** Can view followers/following lists (authenticated)
+- **Authenticated:** Required for all follow operations
 
 ### Performance
 
@@ -47,7 +47,14 @@ Implement follow/unfollow operations with self-follow prevention, denormalized c
 ## 🏗️ Module Structure
 
 ```text
-src/modules/follows/
+src/
+├── common/
+│   ├── cache/
+│   │   ├── cache.config.ts             # CacheKeys patterns
+│   │   └── cache.module.ts             # Global cache (no local imports needed)
+│   └── constants/
+│       └── cache.ts                    # CACHE_TTL constants
+└── modules/follows/
 ├── dto/
 │   ├── follow-response.dto.ts
 │   ├── profile.dto.ts
@@ -55,6 +62,26 @@ src/modules/follows/
 ├── follows.controller.ts
 ├── follows.service.ts
 └── follows.module.ts
+```
+
+**Note:** No barrel exports (index.ts) - import directly from files
+
+### Import Path Conventions
+
+**Absolute Paths** (cross-module imports):
+
+```typescript
+// From follows module importing from other modules
+import { CurrentUser } from '@modules/auth/decorators/current-user.decorator';
+import { UsersService } from '@modules/users/users.service';
+```
+
+**Relative Paths** (within same module):
+
+```typescript
+// Within follows module
+import { FollowResponseDto } from './dto/follow-response.dto';
+import { FollowsService } from './follows.service';
 ```
 
 ---
@@ -69,21 +96,43 @@ src/modules/follows/
 
 ### 2. Follows Service
 
-- followUser: create follow, prevent self-follow (idempotent)
-- unfollowUser: delete follow (idempotent)
-- getFollowers: paginated list of user's followers
-- getFollowing: paginated list of users being followed
-- isFollowing: check if current user follows target
-- batchCheckFollowing: check multiple users at once
-- getFollowedUserIds: for feed queries
+**Core Methods:**
+
+- `followUser()`: Idempotent follow with self-follow prevention, transaction for counts (optional)
+- `unfollowUser()`: Idempotent unfollow with transaction for counts (optional)
+- `getFollowers()`: Paginated list with profiles and following status
+- `getFollowing()`: Paginated list with profiles
+- `isFollowing()`: Single following status check (boolean)
+- `batchCheckFollowing()`: Batch status check (avoid N+1)
+- `getFollowedUserIds()`: IDs array for feed queries
+
+**Key Implementation Points:**
+
+- Prevent self-follow (BadRequestException)
+- Idempotent operations (check existence before create/delete)
+- Transaction for follow + denormalized counts (followersCount, followingCount)
+- Cache invalidation after follow/unfollow
+- Batch checks for performance
+
+### 2.1. Caching Strategy (Optional)
+
+**Caching Strategy:**
+
+- Inject CACHE_MANAGER (global, no local import)
+- Followers/following lists: CACHE_TTL.MEDIUM (5 min)
+- Following status: CACHE_TTL.SHORT (60s)
+- Followed user IDs: CACHE_TTL.MEDIUM (5 min)
+- Invalidate caches on follow/unfollow
 
 ### 3. Follows Controller
 
-- POST /profiles/:username/follow: follow user
-- DELETE /profiles/:username/follow: unfollow user
-- GET /profiles/:username/followers: list followers (public)
-- GET /profiles/:username/following: list following (public)
-- All return profile with following status
+**Endpoints:**
+
+- POST /profiles/:username/follow - Follow user (authenticated)
+- DELETE /profiles/:username/follow - Unfollow (authenticated)
+- GET /profiles/:username/followers - List followers (authenticated, paginated)
+- GET /profiles/:username/following - List following (authenticated, paginated)
+- Use @ApiTags('follows'), @Controller('profiles/:username')
 
 ### 4. Integration Points
 
@@ -113,12 +162,14 @@ src/modules/follows/
 
 ## 📚 Production Best Practices
 
-**Self-Follow Prevention:** Service-level validation before database
-**Idempotency:** Safe to retry without side effects
-**Composite Key:** Database-level duplicate prevention
-**Pagination:** Required for followers/following lists
-**Performance:** Batch checks, indexed queries
-**Integration:** Following status shown in articles, comments, profiles
+- **Self-follow prevention**: Validate followerId !== followingId
+- **Idempotency**: Check existence before create/delete, no errors on duplicates
+- **Composite unique key**: (followerId, followingId) at database level
+- **Transaction safety**: Atomic follow + count updates (optional, counts can be calculated on-demand)
+- **Pagination**: Required for lists (default 20/page)
+- **Performance**: Batch checks, cache followed IDs for feed, indexes on both columns
+- **Integration**: Following status across profiles/articles/comments, getFollowedUserIds() for feed
+- **Error handling**: BadRequestException (self-follow), NotFoundException (invalid user), idempotent operations
 
 ---
 
