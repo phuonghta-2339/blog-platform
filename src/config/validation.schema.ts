@@ -58,4 +58,22 @@ export const configValidationSchema = Joi.object({
     .valid('error', 'warn', 'info', 'debug', 'verbose')
     .default('info')
     .description('Logging level'),
+
+  // JWT Authentication
+  JWT_SECRET: Joi.string()
+    .min(32)
+    .required()
+    .description('Secret key for JWT token signing (minimum 32 characters)'),
+  JWT_EXPIRES_IN: Joi.string()
+    .default('1h')
+    .description('JWT token expiration time (e.g., 7d, 24h, 60m)'),
+  JWT_REFRESH_SECRET: Joi.string()
+    .min(32)
+    .required()
+    .description(
+      'Secret key for JWT refresh token signing (minimum 32 characters)',
+    ),
+  JWT_REFRESH_EXPIRES_IN: Joi.string()
+    .default('7d')
+    .description('JWT refresh token expiration time (e.g., 30d, 7d, 24h)'),
 });

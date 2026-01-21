@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 import { HealthCheckResponseDto } from './common/dto/health-check.dto';
 import { BaseResponseDto } from './common/dto/response.dto';
+import { Public } from './modules/auth/decorators/public.decorator';
 
 @ApiTags('health')
 @Controller({ version: VERSION_NEUTRAL })
@@ -10,6 +11,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   @Get()
+  @Public()
   @ApiOperation({
     summary: 'Root endpoint',
     description: 'Returns API root information',
@@ -24,6 +26,7 @@ export class AppController {
   }
 
   @Get('health')
+  @Public()
   @ApiOperation({
     summary: 'Health check',
     description:

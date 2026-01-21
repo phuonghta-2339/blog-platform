@@ -11,12 +11,33 @@ export interface AppConfig {
   corsMethods: string[];
   corsAllowedHeaders: string[];
   logLevel: string;
+  jwtSecret: string;
+  jwtExpiresIn: string;
+  jwtRefreshSecret: string;
+  jwtRefreshExpiresIn: string;
 }
 
-export default registerAs(
-  'app',
-  (): AppConfig => ({
-    env: process.env.NODE_ENV || 'development',
+export default registerAs('app', (): AppConfig => {
+  const env = process.env.NODE_ENV || 'development';
+  const jwtSecret = process.env.JWT_SECRET;
+  const jwtRefreshSecret = process.env.JWT_REFRESH_SECRET;
+
+  // Fail fast if JWT_SECRET is missing
+  if (!jwtSecret) {
+    throw new Error(
+      'FATAL: JWT_SECRET is required but not set in environment variables.',
+    );
+  }
+
+  // Fail fast if JWT_REFRESH_SECRET is missing
+  if (!jwtRefreshSecret) {
+    throw new Error(
+      'FATAL: JWT_REFRESH_SECRET is required but not set in environment variables.',
+    );
+  }
+
+  return {
+    env,
     name: process.env.APP_NAME || 'Blog Platform',
     port: parseInt(process.env.PORT || '3000', 10),
     host: process.env.HOST || 'localhost',
@@ -32,5 +53,9 @@ export default registerAs(
       header.trim(),
     ) || ['Content-Type', 'Authorization'],
     logLevel: process.env.LOG_LEVEL || 'info',
-  }),
-);
+    jwtSecret: jwtSecret,
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+    jwtRefreshSecret: jwtRefreshSecret,
+    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  };
+});
