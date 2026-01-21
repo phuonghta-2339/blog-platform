@@ -83,6 +83,7 @@ export class UpdateUserDto {
     description: 'User bio (max 500 characters)',
     example: 'Software developer and technical writer',
     maxLength: BIO_MAX_LENGTH,
+    nullable: true,
   })
   @IsOptional()
   @IsString()
@@ -90,13 +91,14 @@ export class UpdateUserDto {
     message: 'Bio must not exceed 500 characters',
   })
   @Transform(({ value }) => transformToTrimmedOrNull(value))
-  bio?: string;
+  bio?: string | null;
 
   @ApiPropertyOptional({
     description:
       'Avatar URL (max 1000 characters) - points to external storage',
     example: 'https://example.com/avatars/johndoe.jpg',
     maxLength: AVATAR_URL_MAX_LENGTH,
+    nullable: true,
   })
   @IsOptional()
   @IsUrl({}, { message: 'Avatar must be a valid URL' })
@@ -104,5 +106,5 @@ export class UpdateUserDto {
     message: 'Avatar URL must not exceed 1000 characters',
   })
   @Transform(({ value }) => transformToTrimmedOrNull(value))
-  avatar?: string;
+  avatar?: string | null;
 }

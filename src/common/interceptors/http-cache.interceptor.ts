@@ -1,6 +1,7 @@
 import {
   CallHandler,
   ExecutionContext,
+  Inject,
   Injectable,
   NestInterceptor,
 } from '@nestjs/common';
@@ -8,7 +9,6 @@ import { Observable, of } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Reflector } from '@nestjs/core';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import {
   CACHE_KEY_METADATA,
@@ -74,7 +74,7 @@ export class HttpCacheInterceptor implements NestInterceptor {
   /**
    * Generate cache key from prefix, URL, and user ID
    * @param prefix - Cache key prefix
-   * @param url - Request URL
+   * @param url - Request URL with query parameters
    * @param userId - Optional user ID
    * @returns Cache key
    */
@@ -84,9 +84,10 @@ export class HttpCacheInterceptor implements NestInterceptor {
     userId?: number,
   ): string {
     const userPart = userId ? `:user:${userId}` : ':public';
-    // Clean URL from query string and normalize
-    const cleanUrl = url.split('?')[0].replace(/\//g, ':');
-    return `${prefix}${cleanUrl}${userPart}`;
+    // Normalize URL path and preserve query parameters
+    // Replace slashes with colons for readability
+    const normalizedUrl = url.replace(/\//g, ':').replace(/\?/g, ':query:');
+    return `${prefix}${normalizedUrl}${userPart}`;
   }
 }
 

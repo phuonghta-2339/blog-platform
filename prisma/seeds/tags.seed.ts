@@ -99,20 +99,26 @@ export const tagsSeedData = [
 export async function seedTags(prisma: PrismaClient): Promise<void> {
   console.log('Seeding tags...');
 
+  // Get existing tags before upserting for accurate tracking
+  const existingTags = await prisma.tag.findMany({
+    select: { slug: true },
+  });
+  const existingSlugs = new Set(existingTags.map((t) => t.slug));
+
   let successCount = 0;
   let skippedCount = 0;
 
   for (const tag of tagsSeedData) {
-    const result = await prisma.tag.upsert({
+    await prisma.tag.upsert({
       where: { slug: tag.slug },
       update: {},
       create: tag,
     });
 
-    if (result.createdAt.getTime() === result.createdAt.getTime()) {
-      successCount++;
-    } else {
+    if (existingSlugs.has(tag.slug)) {
       skippedCount++;
+    } else {
+      successCount++;
     }
   }
 
