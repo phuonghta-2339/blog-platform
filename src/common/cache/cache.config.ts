@@ -44,4 +44,11 @@ export const CacheKeys = {
    * @returns Cache key
    */
   tagList: () => 'tags:list',
+
+  /**
+   * Tag detail cache key
+   * @param slug - Tag slug
+   * @returns Cache key
+   */
+  tagDetail: (slug: string) => `tag:${slug}:detail`,
 } as const;
