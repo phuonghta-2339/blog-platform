@@ -9,11 +9,26 @@ interface RequestWithUser {
  * Current User decorator
  * Extracts the authenticated user from the request object
  * User data is attached by JWT strategy after successful authentication
- * @example async getProfile(@CurrentUser() user: AuthenticatedUser)
+ *
+ * @param data - Optional property name to extract from user object
  */
 export const CurrentUser = createParamDecorator(
-  (data: unknown, ctx: ExecutionContext): AuthenticatedUser | undefined => {
+  (
+    data: keyof AuthenticatedUser | undefined,
+    ctx: ExecutionContext,
+  ):
+    | AuthenticatedUser
+    | AuthenticatedUser[keyof AuthenticatedUser]
+    | undefined => {
     const request = ctx.switchToHttp().getRequest<RequestWithUser>();
-    return request.user;
+    const user = request.user;
+
+    // If no property specified, return full user object
+    if (!data) {
+      return user;
+    }
+
+    // Return specific property if user exists
+    return user?.[data];
   },
 );

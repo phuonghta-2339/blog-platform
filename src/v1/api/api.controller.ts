@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from '@modules/auth/decorators/public.decorator';
 import { ApiService } from './api.service';
 
 /**
@@ -12,9 +13,11 @@ export class ApiController {
   constructor(private readonly apiService: ApiService) {}
 
   @Get('welcome')
+  @Public()
   @ApiOperation({
     summary: 'Welcome message for v1',
-    description: 'Returns a welcome message for API version 1',
+    description:
+      'Returns a welcome message for API version 1. No authentication required.',
   })
   @ApiResponse({
     status: 200,
