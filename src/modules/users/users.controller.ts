@@ -107,7 +107,7 @@ export class UsersController {
   })
   @ApiBadRequestResponse({
     description:
-      'Bad request - No fields to update, duplicate username/email, or validation failed',
+      'Bad request - No fields to update, duplicate username/email, validation failed, incorrect current password, or missing current password when updating email/username',
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   async updateCurrentUser(

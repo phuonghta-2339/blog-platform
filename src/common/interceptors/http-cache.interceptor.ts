@@ -84,10 +84,17 @@ export class HttpCacheInterceptor implements NestInterceptor {
     userId?: number,
   ): string {
     const userPart = userId ? `:user:${userId}` : ':public';
-    // Normalize URL path and preserve query parameters
-    // Replace slashes with colons for readability
-    const normalizedUrl = url.replace(/\//g, ':').replace(/\?/g, ':query:');
-    return `${prefix}${normalizedUrl}${userPart}`;
+
+    // Parse URL to separate path and query string
+    const [path, queryString] = url.split('?');
+
+    // Encode path and query separately to prevent ambiguous keys
+    const encodedPath = encodeURIComponent(path);
+    const encodedQuery = queryString
+      ? `:q:${encodeURIComponent(queryString)}`
+      : '';
+
+    return `${prefix}:${encodedPath}${encodedQuery}${userPart}`;
   }
 }
 

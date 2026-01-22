@@ -102,10 +102,4 @@ export class UserResponseDto {
   })
   @Expose()
   updatedAt!: Date;
-
-  // Explicitly exclude password field
-  password?: string;
-
-  // Exclude isActive from public response
-  isActive?: boolean;
 }

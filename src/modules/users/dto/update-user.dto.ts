@@ -27,10 +27,25 @@ import {
 /**
  * DTO for updating user profile
  * All fields are optional - only provided fields will be updated
+ * NOTE: Updating email or username requires currentPassword for security
  */
 export class UpdateUserDto {
   @ApiPropertyOptional({
-    description: 'User email address',
+    description:
+      'Current password - REQUIRED when updating email or username for security verification',
+    example: 'CurrentPassword123!',
+    minLength: PASSWORD_MIN_LENGTH,
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(PASSWORD_MIN_LENGTH, {
+    message: 'Current password must be at least 8 characters',
+  })
+  currentPassword?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'User email address - Requires current password for verification',
     example: 'newemail@example.com',
     maxLength: EMAIL_MAX_LENGTH,
   })
@@ -43,7 +58,8 @@ export class UpdateUserDto {
   email?: string;
 
   @ApiPropertyOptional({
-    description: 'Username (3-50 characters, alphanumeric + underscore)',
+    description:
+      'Username (3-50 characters, alphanumeric + underscore) - Requires current password for verification',
     example: 'johndoe_updated',
     minLength: USERNAME_MIN_LENGTH,
     maxLength: USERNAME_MAX_LENGTH,

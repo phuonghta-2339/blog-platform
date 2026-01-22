@@ -8,15 +8,15 @@ import {
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Prisma, User } from '@prisma/client';
-import { hash } from 'bcrypt';
+import { hash, compare } from 'bcrypt';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '@/database/prisma.service';
 import { CacheKeys } from '@/common/cache/cache.config';
+import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
+import { CACHE_TTL } from '@/common/constants/cache';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PublicProfileDto } from './dto/public-profile.dto';
-import { CACHE_TTL } from '@/common/constants/cache';
-import { BCRYPT_SALT_ROUNDS } from './constants/users';
 
 /**
  * Users Service
@@ -67,19 +67,15 @@ export class UsersService {
 
   /**
    * Invalidate all caches related to a user
-   * @param userId - User ID
+   * Only invalidates public profile cache (username-based)
    * @param username - Current username
    * @param oldUsername - Previous username (if changed)
    */
   private async invalidateUserCaches(
-    userId: number,
     username: string,
     oldUsername?: string,
   ): Promise<void> {
-    const cacheKeys = [
-      `user:${userId}:profile`,
-      CacheKeys.userProfile(username),
-    ];
+    const cacheKeys = [CacheKeys.userProfile(username)];
 
     // If username changed, also invalidate old username cache
     if (oldUsername && oldUsername !== username) {
@@ -96,22 +92,12 @@ export class UsersService {
   }
 
   /**
-   * Get current user profile with aggregated counts
+   * Get current user profile with aggregated counts (not Authenticated profile)
    * @param userId - Authenticated user ID
    * @returns User profile with stats
    * @throws NotFoundException if user not found or inactive
    */
   async getProfile(userId: number): Promise<UserResponseDto> {
-    // Try cache first for performance (SHORT TTL for authenticated data)
-    const cacheKey = `user:${userId}:profile`;
-    const cached = await this.cacheManager.get<UserResponseDto>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache hit for user profile: ${userId}`);
-      return cached;
-    }
-
-    this.logger.debug(`Cache miss for user profile: ${userId}`);
-
     const user = await this.prisma.user.findUnique({
       where: { id: userId, isActive: true },
       include: {
@@ -129,12 +115,7 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
-    const profile = this.mapToUserResponse(user);
-
-    // Cache authenticated user profile with SHORT TTL (60s)
-    await this.cacheManager.set(cacheKey, profile, CACHE_TTL.SHORT);
-
-    return profile;
+    return this.mapToUserResponse(user);
   }
 
   /**
@@ -149,12 +130,38 @@ export class UsersService {
     userId: number,
     updateUserDto: UpdateUserDto,
   ): Promise<UserResponseDto> {
-    // Check if there are any fields to update (before any processing)
-    if (Object.keys(updateUserDto).length === 0) {
+    const { password, currentPassword, ...updateData } = updateUserDto;
+
+    // Check if there are any meaningful fields to update (excluding currentPassword as it's only for verification)
+    const hasUpdates = Object.keys(updateData).length > 0 || password;
+    if (!hasUpdates) {
       throw new BadRequestException('No fields to update');
     }
 
-    const { password, ...updateData } = updateUserDto;
+    // Security: Require currentPassword for sensitive field changes
+    const isSensitiveUpdate = updateData.email || updateData.username;
+    if (isSensitiveUpdate && !currentPassword) {
+      throw new BadRequestException(
+        'Current password is required to update email or username',
+      );
+    }
+
+    // Verify currentPassword if provided
+    if (currentPassword) {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId, isActive: true },
+        select: { password: true },
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      const isPasswordValid = await compare(currentPassword, user.password);
+      if (!isPasswordValid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+    }
 
     // Prepare data for update
     const data: Prisma.UserUpdateInput = { ...updateData };
@@ -173,6 +180,12 @@ export class UsersService {
           })
         : null;
 
+      // Invalidate cache BEFORE database update to prevent race condition
+      const newUsername = updateData.username || oldUser?.username;
+      if (newUsername) {
+        await this.invalidateUserCaches(newUsername, oldUser?.username);
+      }
+
       const user = await this.prisma.user.update({
         where: { id: userId, isActive: true },
         data,
@@ -186,9 +199,6 @@ export class UsersService {
           },
         },
       });
-
-      // Invalidate all related caches
-      await this.invalidateUserCaches(userId, user.username, oldUser?.username);
 
       return this.mapToUserResponse(user);
     } catch (error) {
