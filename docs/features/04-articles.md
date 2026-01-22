@@ -19,6 +19,8 @@ Implement CRUD operations for articles with pagination, filtering, slug generati
 - Pagination required (default 20, max 99)
 - Guard-based authorization (ArticleAuthorGuard)
 - Optional caching for performance (article detail, lists, feed)
+- **Critical:** GET uses :slug (immutable, SEO-friendly), PUT/DELETE use :id (preventing race conditions on slug changes)
+- **Race Condition Prevention:** :id ensures consistency when article title (and thus slug) may change during concurrent requests
 
 ---
 
@@ -29,8 +31,8 @@ Implement CRUD operations for articles with pagination, filtering, slug generati
 - Create article (POST /articles) - authenticated
 - List articles with filters (GET /articles) - public/authenticated
 - Get single article (GET /articles/:slug) - public/authenticated
-- Update article (PUT /articles/:slug) - author or admin only
-- Delete article (DELETE /articles/:slug) - author or admin only
+- Update article (PUT /articles/:id) - author or admin only
+- Delete article (DELETE /articles/:id) - author or admin only
 - Personal feed (GET /articles/feed) - authenticated (from followed users)
 - Auto-generate unique slug from title
 - Draft/published status support
@@ -141,7 +143,7 @@ import { ArticleAuthorGuard } from './guards/article-author.guard';
 ### 3. Article Author Guard
 
 - Verify current user is article author OR admin
-- Applied to PUT /articles/:slug and DELETE /articles/:slug
+- Applied to PUT /articles/:id and DELETE /articles/:id
 - Throw ForbiddenException if unauthorized
 
 ### 4. Articles Service
@@ -176,8 +178,8 @@ import { ArticleAuthorGuard } from './guards/article-author.guard';
 - `GET /articles` - List with filters (public, returns paginated list)
 - `GET /articles/feed` - Personal feed (authenticated, followed users)
 - `GET /articles/:slug` - Detail (public, returns single article)
-- `PUT /articles/:slug` - Update (author/admin only with guard)
-- `DELETE /articles/:slug` - Delete (author/admin only with guard)
+- `PUT /articles/:id` - Update (author/admin only with guard)
+- `DELETE /articles/:id` - Delete (author/admin only with guard)
 
 **Key Notes:**
 
@@ -279,6 +281,8 @@ import { ArticleAuthorGuard } from './guards/article-author.guard';
 - Export ArticlesService for Comments and Favorites modules
 - Inject TagsService for cache invalidation coordination
 - NO CacheModule.register() needed in module
+- **CRITICAL:**
+- Comments and Favorites services independently query articles by ID for operations
 
 **Transaction Pattern:**
 

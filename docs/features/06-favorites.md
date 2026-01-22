@@ -4,10 +4,12 @@
 
 Implement toggle favorite operations with idempotent design, denormalized counts, and transaction safety for concurrent request handling.
 
-**Cross-Module Dependencies:**
+**Key Implementation Notes:**
 
-- Used by → Articles module (favoritesCount, favorited status)
-- Depends on → Articles, Users modules
+- Favorites use article :id (not :slug) to avoid race conditions
+- Idempotent operations: no error if already favorited/unfavorited (safe retries)
+- Transaction safety: favorite/unfavorite + favoritesCount update atomic
+- Composite unique constraint (userId, articleId) at database level
 
 ---
 
@@ -15,8 +17,8 @@ Implement toggle favorite operations with idempotent design, denormalized counts
 
 ### Favorite Operations
 
-- Favorite article (POST /articles/:slug/favorite) - authenticated
-- Unfavorite article (DELETE /articles/:slug/favorite) - authenticated
+- Favorite article (POST /articles/:id/favorite) - authenticated
+- Unfavorite article (DELETE /articles/:id/favorite) - authenticated
 - List favorited articles (GET /articles?favorited={username}) - handled by Articles
 - Idempotent operations (safe retries)
 
@@ -111,12 +113,12 @@ import { FavoritesService } from './favorites.service';
 
 **Endpoints:**
 
-- POST /articles/:slug/favorite - Favorite article (authenticated)
-- DELETE /articles/:slug/favorite - Unfavorite (authenticated)
+- POST /articles/:id/favorite - Favorite article (authenticated)
+- DELETE /articles/:id/favorite - Unfavorite (authenticated)
 
 **Configuration:**
 
-- @ApiTags('favorites'), @Controller('articles/:slug/favorite')
+- @ApiTags('favorites'), @Controller('articles/:id/favorite')
 - Both return updated article with new favoritesCount
 - No @Public() - authentication required
 
@@ -155,6 +157,7 @@ import { FavoritesService } from './favorites.service';
 - Unfavorite operation safe when already unfavorited (no error thrown)
 - Check existence before count update
 - Critical for network retry scenarios
+- **CRITICAL:** Article lookup uses :id to prevent race conditions when article is being renamed
 
 **Transaction Safety:**
 
@@ -162,6 +165,7 @@ import { FavoritesService } from './favorites.service';
 - Atomic: favorite/unfavorite + count update together
 - Rollback on failure ensures consistency
 - Use `prisma.$transaction()` for all operations
+- Isolation level: ReadCommitted to prevent dirty reads
 
 **Composite Unique Key:**
 

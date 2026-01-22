@@ -4,10 +4,12 @@
 
 Implement CR-D operations for comments (no update by design) with article linking, denormalized counts, and transaction safety for data integrity.
 
-**Cross-Module Dependencies:**
+**Key Implementation Notes:**
 
-- Used by → Articles module (commentsCount)
-- Depends on → Articles, Users modules
+- Comments use article :id (not :slug) to avoid race conditions when article slug changes
+- Comment delete endpoint uses :commentId (not :id) to avoid parameter ambiguity
+- Cascade delete: when article deleted, all comments deleted (Prisma cascade)
+- Transaction safety: comment create/delete + commentsCount update atomic
 
 ---
 
@@ -15,9 +17,9 @@ Implement CR-D operations for comments (no update by design) with article linkin
 
 ### Comment Operations
 
-- Create comment on article (POST /articles/:slug/comments) - authenticated
-- List comments on article (GET /articles/:slug/comments) - public with pagination
-- Delete own comment (DELETE /articles/:slug/comments/:id) - author or admin
+- Create comment on article (POST /articles/:id/comments) - authenticated
+- List comments on article (GET /articles/:id/comments) - public with pagination
+- Delete own comment (DELETE /articles/:id/comments/:commentId) - author or admin
 - No update operation (transparency by design)
 
 ### Data Requirements
@@ -131,14 +133,13 @@ import { CommentAuthorGuard } from './guards/comment-author.guard';
 
 **Endpoints:**
 
-- POST /articles/:slug/comments - Create (authenticated)
-- GET /articles/:slug/comments - List (public with @Public())
-- GET /articles/:slug/comments/:id - Single comment (public)
-- DELETE /articles/:slug/comments/:id - Delete (CommentAuthorGuard)
+- POST /articles/:id/comments - Create (authenticated)
+- GET /articles/:id/comments - List (public with @Public())
+- DELETE /articles/:id/comments/:commentId - Delete (CommentAuthorGuard)
 
 **Configuration:**
 
-- @ApiTags('comments'), @Controller('articles/:slug/comments')
+- @ApiTags('comments'), @Controller('articles/:id/comments')
 - Nested route under articles
 - Use @CurrentUser() for authenticated requests
 
@@ -171,6 +172,8 @@ import { CommentAuthorGuard } from './guards/comment-author.guard';
 - Atomic operations: comment + article.commentsCount together
 - Rollback on any failure ensures data consistency
 - Use `prisma.$transaction()` for all create/delete operations
+- Isolation level: ReadCommitted to prevent dirty reads
+- **CRITICAL:** Article lookup uses :id to prevent race conditions when article is being renamed
 
 **No Update Operation:**
 
