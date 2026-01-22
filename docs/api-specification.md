@@ -578,7 +578,7 @@ Authorization: Bearer <token>
 
 ### 3.5. Update article
 
-**Endpoint:** `PUT /articles/:slug`
+**Endpoint:** `PUT /articles/:id`
 
 **Access:** Authenticated (Author only)
 
@@ -638,7 +638,7 @@ Authorization: Bearer <token>
 
 ### 3.6. Delete an article
 
-**Endpoint:** `DELETE /articles/:slug`
+**Endpoint:** `DELETE /articles/:id`
 
 **Access:** Authenticated (Author or ADMIN)
 
@@ -676,7 +676,7 @@ Authorization: Bearer <token>
 
 ### 4.1. Get list of comments for an article
 
-**Endpoint:** `GET /articles/:slug/comments`
+**Endpoint:** `GET /articles/:id/comments`
 
 **Access:** Public
 
@@ -719,7 +719,7 @@ Authorization: Bearer <token>
 
 ### 4.2. Add a comment to the article
 
-**Endpoint:** `POST /articles/:slug/comments`
+**Endpoint:** `POST /articles/:id/comments`
 
 **Access:** Authenticated
 
@@ -749,7 +749,7 @@ Authorization: Bearer <token>
       "username": "johndoe",
       "avatar": "https://example.com/avatars/johndoe.jpg"
     },
-    "articleSlug": "how-to-learn-nestjs",
+    "articleId": 1,
     "createdAt": "2026-01-14T10:30:00.000Z"
   }
 }
@@ -779,9 +779,9 @@ Authorization: Bearer <token>
 
 ---
 
-### 4.3. Delete an comment
+### 4.3. Delete a comment
 
-**Endpoint:** `DELETE /articles/:slug/comments/:id`
+**Endpoint:** `DELETE /articles/:id/comments/:commentId`
 
 **Access:** Authenticated (Comment author or ADMIN)
 
@@ -908,7 +908,7 @@ Authorization: Bearer <token>
 
 ### 6.1. Favorite article
 
-**Endpoint:** `POST /articles/:slug/favorite`
+**Endpoint:** `POST /articles/:id/favorite`
 
 **Access:** Authenticated
 
@@ -951,7 +951,7 @@ Authorization: Bearer <token>
 
 ### 6.2. Unfavorite article
 
-**Endpoint:** `DELETE /articles/:slug/favorite`
+**Endpoint:** `DELETE /articles/:id/favorite`
 
 **Access:** Authenticated
 
