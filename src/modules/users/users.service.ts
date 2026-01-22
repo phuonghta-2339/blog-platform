@@ -92,7 +92,7 @@ export class UsersService {
   }
 
   /**
-   * Get current user profile with aggregated counts (not Authenticated profile)
+   * Get current user profile with aggregated counts
    * @param userId - Authenticated user ID
    * @returns User profile with stats
    * @throws NotFoundException if user not found or inactive
@@ -139,10 +139,11 @@ export class UsersService {
     }
 
     // Security: Require currentPassword for sensitive field changes
-    const isSensitiveUpdate = updateData.email || updateData.username;
+    const isSensitiveUpdate =
+      updateData.email || updateData.username || password;
     if (isSensitiveUpdate && !currentPassword) {
       throw new BadRequestException(
-        'Current password is required to update email or username',
+        'Current password is required to update email, username, or password',
       );
     }
 
@@ -180,12 +181,6 @@ export class UsersService {
           })
         : null;
 
-      // Invalidate cache BEFORE database update to prevent race condition
-      const newUsername = updateData.username || oldUser?.username;
-      if (newUsername) {
-        await this.invalidateUserCaches(newUsername, oldUser?.username);
-      }
-
       const user = await this.prisma.user.update({
         where: { id: userId, isActive: true },
         data,
@@ -199,6 +194,11 @@ export class UsersService {
           },
         },
       });
+
+      // Invalidate cache AFTER successful database update to prevent race condition
+      if (updateData.username) {
+        await this.invalidateUserCaches(user.username, oldUser?.username);
+      }
 
       return this.mapToUserResponse(user);
     } catch (error) {

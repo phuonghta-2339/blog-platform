@@ -11,7 +11,6 @@ import { configValidationSchema } from './config/validation.schema';
 import { V1Module } from './v1';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
-import { HttpCacheInterceptor } from './common/interceptors/http-cache.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 @Module({
@@ -62,10 +61,6 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
       useClass: RolesGuard,
     },
     // Global Interceptors
-    {
-      provide: APP_INTERCEPTOR,
-      useClass: HttpCacheInterceptor,
-    },
     {
       provide: APP_INTERCEPTOR,
       useClass: TransformInterceptor,

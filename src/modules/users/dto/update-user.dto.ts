@@ -14,6 +14,7 @@ import {
   AVATAR_URL_MAX_LENGTH,
   BIO_MAX_LENGTH,
   EMAIL_MAX_LENGTH,
+  PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
@@ -27,19 +28,23 @@ import {
 /**
  * DTO for updating user profile
  * All fields are optional - only provided fields will be updated
- * NOTE: Updating email or username requires currentPassword for security
+ * NOTE: Updating email, username, or password requires currentPassword for security
  */
 export class UpdateUserDto {
   @ApiPropertyOptional({
     description:
-      'Current password - REQUIRED when updating email or username for security verification',
+      'Current password - REQUIRED when updating email, username, or password for security verification',
     example: 'CurrentPassword123!',
     minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH, {
     message: 'Current password must be at least 8 characters',
+  })
+  @MaxLength(PASSWORD_MAX_LENGTH, {
+    message: 'Current password must not exceed 128 characters',
   })
   currentPassword?: string;
 
@@ -80,14 +85,18 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     description:
-      'New password (min 8 characters, at least 1 uppercase, 1 lowercase, 1 number)',
+      'New password (8-128 characters, at least 1 uppercase, 1 lowercase, 1 number) - Requires current password for verification',
     example: 'NewPassword123!',
     minLength: PASSWORD_MIN_LENGTH,
+    maxLength: PASSWORD_MAX_LENGTH,
   })
   @IsOptional()
   @IsString()
   @MinLength(PASSWORD_MIN_LENGTH, {
     message: 'Password must be at least 8 characters',
+  })
+  @MaxLength(PASSWORD_MAX_LENGTH, {
+    message: 'Password must not exceed 128 characters',
   })
   @Matches(PASSWORD_REGEX, {
     message:

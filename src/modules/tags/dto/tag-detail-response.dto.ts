@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Expose, Type } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
 import { TagResponseDto } from './tag-response.dto';
 
 /**
@@ -7,6 +7,7 @@ import { TagResponseDto } from './tag-response.dto';
  * Will be replaced with full ArticleResponseDto when Articles module is implemented
  * @todo Replace with actual ArticleResponseDto from Articles module
  */
+@Exclude()
 export class MinimalArticleDto {
   @ApiProperty({ description: 'Article ID', example: 1 })
   @Expose()
