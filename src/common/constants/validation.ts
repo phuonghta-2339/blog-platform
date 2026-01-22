@@ -31,3 +31,13 @@ export const DEFAULT_FOLLOWING_STATUS = false;
  * Example JWT token for API documentation
  */
 export const EXAMPLE_JWT_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+/**
+ * Article field constraints
+ */
+export const ARTICLE_TITLE_MIN_LENGTH = 1;
+export const ARTICLE_TITLE_MAX_LENGTH = 255;
+export const ARTICLE_DESCRIPTION_MIN_LENGTH = 1;
+export const ARTICLE_DESCRIPTION_MAX_LENGTH = 1000;
+export const ARTICLE_BODY_MIN_LENGTH = 1;
+export const ARTICLE_TAG_LIST_MAX_SIZE = 10;
