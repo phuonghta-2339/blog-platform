@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Prisma, User } from '@prisma/client';
 import { hash, compare } from 'bcrypt';
 import { PrismaService } from '@/database/prisma.service';
+import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -38,7 +39,7 @@ export class AuthService {
 
     try {
       // Hash password
-      const hashedPassword = await hash(password, 10);
+      const hashedPassword = await hash(password, BCRYPT_SALT_ROUNDS);
       // Create user
       user = await this.prisma.user.create({
         data: {

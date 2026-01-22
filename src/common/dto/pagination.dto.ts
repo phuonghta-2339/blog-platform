@@ -1,6 +1,13 @@
 import { IsInt, IsOptional, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  PAGINATION_LIMIT_DEFAULT,
+  PAGINATION_LIMIT_MAX,
+  PAGINATION_LIMIT_MIN,
+  PAGINATION_OFFSET_DEFAULT,
+  PAGINATION_OFFSET_MIN,
+} from '@common/constants/validation';
 
 /**
  * Pagination Query DTO
@@ -9,29 +16,29 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 export class PaginationDto {
   @ApiPropertyOptional({
     description: 'Number of items per page',
-    minimum: 1,
-    maximum: 99,
-    default: 20,
-    example: 20,
+    minimum: PAGINATION_LIMIT_MIN,
+    maximum: PAGINATION_LIMIT_MAX,
+    default: PAGINATION_LIMIT_DEFAULT,
+    example: PAGINATION_LIMIT_DEFAULT,
     type: Number,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
-  @Max(99)
-  limit: number = 20;
+  @Min(PAGINATION_LIMIT_MIN)
+  @Max(PAGINATION_LIMIT_MAX)
+  limit: number = PAGINATION_LIMIT_DEFAULT;
 
   @ApiPropertyOptional({
     description: 'Number of items to skip (for pagination)',
-    minimum: 0,
-    default: 0,
-    example: 0,
+    minimum: PAGINATION_OFFSET_MIN,
+    default: PAGINATION_OFFSET_DEFAULT,
+    example: PAGINATION_OFFSET_DEFAULT,
     type: Number,
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(0)
-  offset: number = 0;
+  @Min(PAGINATION_OFFSET_MIN)
+  offset: number = PAGINATION_OFFSET_DEFAULT;
 }

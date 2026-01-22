@@ -3,7 +3,6 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { setupSwagger } from './config/swagger.config';
 import { AppConfigService } from './config';
 
@@ -47,9 +46,6 @@ async function bootstrap() {
       new HttpExceptionFilter(),
       new PrismaExceptionFilter(),
     );
-
-    // Global interceptors
-    app.useGlobalInterceptors(new TransformInterceptor());
 
     // Enable CORS
     app.enableCors({

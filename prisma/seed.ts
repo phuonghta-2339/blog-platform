@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { seedTags } from './seeds/tags.seed';
 
 // Create connection pool for Prisma 7.x
 const connectionString: string | undefined = process.env.DATABASE_URL;
@@ -16,42 +17,12 @@ const adapter: PrismaPg = new PrismaPg(pool);
 const prisma: PrismaClient = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('Start seeding...');
+  console.log('🌱 Start seeding...\n');
 
-  // Seed tags
-  const tags = [
-    { name: 'JavaScript', slug: 'javascript' },
-    { name: 'TypeScript', slug: 'typescript' },
-    { name: 'NestJS', slug: 'nestjs' },
-    { name: 'Node.js', slug: 'nodejs' },
-    { name: 'React', slug: 'react' },
-    { name: 'Vue.js', slug: 'vuejs' },
-    { name: 'Angular', slug: 'angular' },
-    { name: 'Web Development', slug: 'web-development' },
-    { name: 'Backend', slug: 'backend' },
-    { name: 'Frontend', slug: 'frontend' },
-    { name: 'Database', slug: 'database' },
-    { name: 'PostgreSQL', slug: 'postgresql' },
-    { name: 'DevOps', slug: 'devops' },
-    { name: 'Tutorial', slug: 'tutorial' },
-    { name: 'Best Practices', slug: 'best-practices' },
-    { name: 'Architecture', slug: 'architecture' },
-    { name: 'API Design', slug: 'api-design' },
-    { name: 'Testing', slug: 'testing' },
-    { name: 'Security', slug: 'security' },
-    { name: 'Performance', slug: 'performance' },
-  ];
+  // Seed tags with comprehensive data
+  await seedTags(prisma);
 
-  for (const tag of tags) {
-    await prisma.tag.upsert({
-      where: { slug: tag.slug },
-      update: {},
-      create: tag,
-    });
-    console.log(`✓ Created tag: ${tag.name}`);
-  }
-
-  console.log('Seeding completed successfully!');
+  console.log('\n✅ Seeding completed successfully!');
 }
 
 main()
