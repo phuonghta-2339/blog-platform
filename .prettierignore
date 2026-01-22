@@ -1,0 +1,14 @@
+# Ignore directories
+/dist
+/build
+/node_modules
+/.husky
+/coverage
+
+# Ignore files
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+*.spec.ts
