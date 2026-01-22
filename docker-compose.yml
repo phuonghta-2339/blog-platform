@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -96,14 +94,14 @@ services:
 # Named volumes for data persistence
 volumes:
   postgres_data:
-    driver: local
-    name: blog_postgres_data
+    external: true
+    name: blog_platform_postgres_data
   pgadmin_data:
-    driver: local
-    name: blog_pgadmin_data
+    external: true
+    name: blog_platform_pgadmin_data
 
 # Custom network for service isolation
 networks:
   blog-network:
     driver: bridge
-    name: blog_network
+    name: blog_platform_network
