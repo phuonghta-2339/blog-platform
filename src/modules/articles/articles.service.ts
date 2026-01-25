@@ -332,7 +332,13 @@ export class ArticlesService {
               include: this.getArticleIncludeConfig(authorId),
             });
 
-            return articleWithTags!;
+            if (!articleWithTags) {
+              throw new Error(
+                'Failed to fetch created article with tags - transaction will rollback',
+              );
+            }
+
+            return articleWithTags;
           }
 
           return article;
@@ -632,12 +638,29 @@ export class ArticlesService {
 
           // Generate new slug if title changed (within transaction for atomicity)
           if (title) {
-            const newSlug = await this.generateUniqueSlugInTransaction(
-              tx,
-              title,
-            );
+            // Generate base slug from new title
+            let baseSlug: string;
+            try {
+              baseSlug = slugify(title);
+            } catch (error) {
+              throw new BadRequestException(
+                error instanceof Error
+                  ? error.message
+                  : 'Invalid title: cannot generate slug from the provided title',
+              );
+            }
+
+            // Only regenerate slug if base slug differs from current slug
+            // This prevents unnecessary slug changes when updating with same/similar title
+            if (baseSlug !== oldSlug) {
+              const newSlug = await this.generateUniqueSlugInTransaction(
+                tx,
+                title,
+              );
+              updateData.slug = newSlug;
+            }
+            // Always update title even if slug stays the same
             updateData.title = title;
-            updateData.slug = newSlug;
           }
           if (description !== undefined) updateData.description = description;
           if (body !== undefined) updateData.body = body;

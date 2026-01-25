@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Logger,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthenticatedUser } from '@modules/auth/interfaces/authenticated-user.interface';
@@ -25,14 +26,20 @@ export class ArticleAuthorGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<{
       user: AuthenticatedUser;
-      params: { id: number };
+      params: { id: string };
       article?: { id: number; authorId: number; slug: string };
     }>();
     const user = request.user;
-    const id = request.params.id;
+    const idParam = request.params.id;
 
     if (!user) {
       throw new ForbiddenException('Authentication required');
+    }
+
+    // Parse and validate id parameter
+    const id = parseInt(idParam, 10);
+    if (isNaN(id) || id <= 0) {
+      throw new BadRequestException('Invalid article ID');
     }
 
     // Check if article exists and get id + authorId + slug
