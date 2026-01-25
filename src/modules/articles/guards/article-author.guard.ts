@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
@@ -13,26 +14,25 @@ import { Role } from '@prisma/client';
  * Article Author Guard
  * Verifies that the current user is the article author or an admin
  * Used for protecting update and delete operations
+ * Logs privileged admin actions for audit and security purposes
  */
 @Injectable()
 export class ArticleAuthorGuard implements CanActivate {
+  private readonly logger = new Logger(ArticleAuthorGuard.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<{
       user: AuthenticatedUser;
-      params: { id: string };
+      params: { id: number };
       article?: { id: number; authorId: number; slug: string };
     }>();
     const user = request.user;
-    const id = parseInt(request.params.id, 10);
+    const id = request.params.id;
 
     if (!user) {
       throw new ForbiddenException('Authentication required');
-    }
-
-    if (isNaN(id)) {
-      throw new NotFoundException('Invalid article ID');
     }
 
     // Check if article exists and get id + authorId + slug
@@ -47,6 +47,17 @@ export class ArticleAuthorGuard implements CanActivate {
 
     // Admin can update/delete any article
     if (user.role === Role.ADMIN) {
+      // Log privileged admin action for audit purposes
+      if (article.authorId !== user.id) {
+        const httpRequest = context
+          .switchToHttp()
+          .getRequest<{ method: string }>();
+        const action = httpRequest.method === 'PUT' ? 'update' : 'delete';
+        this.logger.warn(
+          `Admin user (id=${user.id}) is performing privileged ${action} ` +
+            `on article (id=${article.id}) owned by user (id=${article.authorId})`,
+        );
+      }
       // Attach article to request for controller use
       request.article = article;
       return true;

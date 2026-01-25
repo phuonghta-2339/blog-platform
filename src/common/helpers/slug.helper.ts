@@ -8,9 +8,15 @@
  * Converts to lowercase, replaces spaces with hyphens, removes special characters
  * @param text - Text to slugify
  * @returns URL-friendly slug
+ * @throws Error if text is empty, whitespace-only, or produces an empty slug after processing
  */
 export function slugify(text: string): string {
-  return text
+  // Validate input is not empty or whitespace-only
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    throw new Error('Slug input cannot be empty or whitespace-only');
+  }
+
+  const slug = text
     .toLowerCase()
     .trim()
     .normalize('NFD') // Normalize Unicode characters
@@ -20,6 +26,15 @@ export function slugify(text: string): string {
     .replace(/--+/g, '-') // Replace multiple hyphens with single hyphen
     .replace(/^-+/, '') // Remove leading hyphens
     .replace(/-+$/, ''); // Remove trailing hyphens
+
+  // Validate result is not empty (handles cases like "🎉🎊" or "!!!@@@")
+  if (!slug) {
+    throw new Error(
+      `Invalid slug input: "${text}" contains only special characters or emojis and cannot be converted to a valid slug`,
+    );
+  }
+
+  return slug;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsOptional, IsInt, Min, Max, IsEnum } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   PAGINATION_LIMIT_MIN,
   PAGINATION_LIMIT_MAX,
@@ -8,6 +8,10 @@ import {
   PAGINATION_OFFSET_MIN,
   PAGINATION_OFFSET_DEFAULT,
 } from '@common/constants/validation';
+import {
+  transformNumberWithDefault,
+  transformEnumWithDefault,
+} from '@common/helpers/transform.helper';
 
 /**
  * Sort order enum
@@ -65,6 +69,7 @@ export class ArticleQueryDto {
     maximum: PAGINATION_LIMIT_MAX,
     required: false,
   })
+  @Transform(transformNumberWithDefault(PAGINATION_LIMIT_DEFAULT))
   @Type(() => Number)
   @IsInt()
   @Min(PAGINATION_LIMIT_MIN)
@@ -79,6 +84,7 @@ export class ArticleQueryDto {
     minimum: PAGINATION_OFFSET_MIN,
     required: false,
   })
+  @Transform(transformNumberWithDefault(PAGINATION_OFFSET_DEFAULT))
   @Type(() => Number)
   @IsInt()
   @Min(PAGINATION_OFFSET_MIN)
@@ -92,6 +98,7 @@ export class ArticleQueryDto {
     default: ArticleSortBy.CREATED_AT,
     required: false,
   })
+  @Transform(transformEnumWithDefault(ArticleSortBy.CREATED_AT))
   @IsEnum(ArticleSortBy)
   @IsOptional()
   sortBy?: ArticleSortBy = ArticleSortBy.CREATED_AT;
@@ -103,6 +110,7 @@ export class ArticleQueryDto {
     default: SortOrder.DESC,
     required: false,
   })
+  @Transform(transformEnumWithDefault(SortOrder.DESC))
   @IsEnum(SortOrder)
   @IsOptional()
   order?: SortOrder = SortOrder.DESC;

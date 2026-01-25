@@ -7,13 +7,21 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
-import { Article, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '@/database/prisma.service';
 import { CacheKeys } from '@/common/cache/cache.config';
 import { slugify, generateUniqueSlug } from '@/common/helpers/slug.helper';
-import { ARTICLE_TITLE_MAX_LENGTH } from '@/common/constants/validation';
+import { hasAtLeastOneField } from '@/common/helpers/validation.helper';
+import { handlePrismaError } from '@/common/helpers/database.helper';
+import { deleteCacheByPattern } from '@/common/helpers/cache.helper';
+import { MAX_QUERY_RETRIES } from '@/common/constants/database';
+import {
+  ARTICLE_TITLE_MAX_LENGTH,
+  ARTICLE_UPDATABLE_FIELDS,
+} from '@/common/constants/validation';
 import { TagsService } from '@modules/tags/tags.service';
+import { ArticleWithRelations } from './types/article-with-relations.type';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import {
@@ -46,23 +54,87 @@ export class ArticlesService {
   ) {}
 
   /**
-   * Generate unique slug from title
-   * Checks for duplicates and adds timestamp suffix if needed
+   * Get reusable article include configuration
+   * Extracts common query patterns for consistent article fetching with relations
+   * @param userId - Optional current user ID for favorited status filtering
+   * @returns Prisma include configuration for article queries
+   */
+  private getArticleIncludeConfig(userId?: number): Prisma.ArticleInclude {
+    return {
+      author: {
+        select: {
+          id: true,
+          username: true,
+          bio: true,
+          avatar: true,
+        },
+      },
+      tags: {
+        include: {
+          tag: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
+        },
+      },
+      favorites: userId
+        ? {
+            where: { userId },
+            select: { userId: true },
+          }
+        : false,
+      _count: {
+        select: {
+          favorites: true,
+          comments: true,
+        },
+      },
+    };
+  }
+
+  /**
+   * Generate unique slug within transaction with retry logic
+   * Handles concurrent slug generation by retrying on unique constraint violation
+   * @param tx - Prisma transaction client
    * @param title - Article title
    * @returns Unique slug
    */
-  private async generateUniqueSlugFromTitle(title: string): Promise<string> {
-    const baseSlug = slugify(title);
+  private async generateUniqueSlugInTransaction(
+    tx: Prisma.TransactionClient,
+    title: string,
+  ): Promise<string> {
+    let baseSlug: string;
+
+    try {
+      baseSlug = slugify(title);
+    } catch (error) {
+      // Handle invalid title that produces empty slug (e.g., "🎉🎊", "!!!@@@")
+      throw new BadRequestException(
+        error instanceof Error
+          ? error.message
+          : 'Invalid title: cannot generate slug from the provided title',
+      );
+    }
+
     let slug = baseSlug;
     let counter = 0;
 
-    // Check for duplicates and generate unique slug
-    while (await this.prisma.article.findUnique({ where: { slug } })) {
+    // Check for duplicates and generate unique slug within transaction
+    while (counter < MAX_QUERY_RETRIES) {
+      const existing = await tx.article.findUnique({ where: { slug } });
+      if (!existing) {
+        return slug;
+      }
       slug = generateUniqueSlug(baseSlug, counter, ARTICLE_TITLE_MAX_LENGTH);
       counter++;
     }
 
-    return slug;
+    throw new BadRequestException(
+      `Unable to generate unique slug for title after ${MAX_QUERY_RETRIES} attempts`,
+    );
   }
 
   /**
@@ -72,26 +144,7 @@ export class ArticlesService {
    * @returns Transformed DTO
    */
   private mapToArticleResponse(
-    article: Article & {
-      author: {
-        id: number;
-        username: string;
-        bio: string | null;
-        avatar: string | null;
-      };
-      tags: Array<{
-        tag: {
-          id: number;
-          name: string;
-          slug: string;
-        };
-      }>;
-      favorites?: Array<{ userId: number }>;
-      _count?: {
-        favorites: number;
-        comments: number;
-      };
-    },
+    article: ArticleWithRelations,
     currentUserId?: number,
     isFollowingAuthor?: boolean,
   ): ArticleResponseDto {
@@ -172,20 +225,44 @@ export class ArticlesService {
   }
 
   /**
-   * Invalidate article caches
-   * @param slug - Article slug
+   * Invalidate article-related caches
+   * Clears both individual article cache and all article list/pagination caches
+   * This ensures that when articles are created, updated, or deleted,
+   * both direct article access and list pages show fresh data
+   * @param slug - Specific article slug to invalidate (optional)
    */
   private async invalidateArticleCaches(slug?: string): Promise<void> {
-    const cacheKeys: string[] = [];
+    const cacheInvalidations: Promise<void>[] = [];
 
+    // Always invalidate all article list caches when any article changes
+    // This includes pagination, filtering, sorting results
+    cacheInvalidations.push(
+      (async () => {
+        const deletedCount = await deleteCacheByPattern(
+          this.cacheManager,
+          'article*',
+          this.logger,
+        );
+
+        if (deletedCount > 0) {
+          this.logger.debug(
+            `Invalidated ${deletedCount} article list cache keys`,
+          );
+        }
+      })(),
+    );
+
+    // Invalidate specific article cache if slug provided
     if (slug) {
-      cacheKeys.push(CacheKeys.article(slug));
+      cacheInvalidations.push(
+        (async () => {
+          await this.cacheManager.del(CacheKeys.article(slug));
+          this.logger.debug(`Invalidated cache for article slug: ${slug}`);
+        })(),
+      );
     }
 
-    // Invalidate all article list caches
-    await Promise.all(cacheKeys.map((key) => this.cacheManager.del(key)));
-
-    this.logger.debug(`Invalidated ${cacheKeys.length} article cache keys`);
+    await Promise.all(cacheInvalidations);
   }
 
   /**
@@ -206,13 +283,16 @@ export class ArticlesService {
       isPublished = true,
     } = createDto;
 
-    // Generate unique slug
-    const articleSlug = await this.generateUniqueSlugFromTitle(title);
-
     try {
-      // Use transaction for atomic operations
+      // Use transaction for atomic operations including slug generation
       const result = await this.prisma.$transaction(
         async (tx) => {
+          // Generate unique slug within transaction to avoid race conditions
+          const articleSlug = await this.generateUniqueSlugInTransaction(
+            tx,
+            title,
+          );
+
           // Create article
           const article = await tx.article.create({
             data: {
@@ -223,33 +303,7 @@ export class ArticlesService {
               authorId,
               isPublished,
             },
-            include: {
-              author: {
-                select: {
-                  id: true,
-                  username: true,
-                  bio: true,
-                  avatar: true,
-                },
-              },
-              tags: {
-                include: {
-                  tag: {
-                    select: {
-                      id: true,
-                      name: true,
-                      slug: true,
-                    },
-                  },
-                },
-              },
-              _count: {
-                select: {
-                  favorites: true,
-                  comments: true,
-                },
-              },
-            },
+            include: this.getArticleIncludeConfig(authorId),
           });
 
           // Connect tags if provided
@@ -275,33 +329,7 @@ export class ArticlesService {
             // Fetch article with tags
             const articleWithTags = await tx.article.findUnique({
               where: { id: article.id },
-              include: {
-                author: {
-                  select: {
-                    id: true,
-                    username: true,
-                    bio: true,
-                    avatar: true,
-                  },
-                },
-                tags: {
-                  include: {
-                    tag: {
-                      select: {
-                        id: true,
-                        name: true,
-                        slug: true,
-                      },
-                    },
-                  },
-                },
-                _count: {
-                  select: {
-                    favorites: true,
-                    comments: true,
-                  },
-                },
-              },
+              include: this.getArticleIncludeConfig(authorId),
             });
 
             return articleWithTags!;
@@ -316,17 +344,17 @@ export class ArticlesService {
 
       // Invalidate caches outside transaction
       await Promise.all([
-        this.invalidateArticleCaches(articleSlug),
+        this.invalidateArticleCaches(result.slug),
         this.tagsService.clearCache(),
       ]);
 
-      this.logger.log(`Created article: ${articleSlug}`);
-      return this.mapToArticleResponse(result, authorId);
-    } catch (error) {
-      this.logger.error(
-        `Failed to create article: ${error instanceof Error ? error.message : String(error)}`,
+      this.logger.log(`Created article: ${result.slug}`);
+      return this.mapToArticleResponse(
+        result as unknown as ArticleWithRelations,
+        authorId,
       );
-      throw new BadRequestException('Failed to create article');
+    } catch (error) {
+      handlePrismaError(error as Error, 'create', this.logger);
     }
   }
 
@@ -403,39 +431,7 @@ export class ArticlesService {
           orderBy,
           skip: offset,
           take: limit,
-          include: {
-            author: {
-              select: {
-                id: true,
-                username: true,
-                bio: true,
-                avatar: true,
-              },
-            },
-            tags: {
-              include: {
-                tag: {
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                  },
-                },
-              },
-            },
-            favorites: currentUserId
-              ? {
-                  where: { userId: currentUserId },
-                  select: { userId: true },
-                }
-              : false,
-            _count: {
-              select: {
-                favorites: true,
-                comments: true,
-              },
-            },
-          },
+          include: this.getArticleIncludeConfig(currentUserId),
         }),
       ]);
 
@@ -456,7 +452,7 @@ export class ArticlesService {
       // Map to DTOs
       const articleDtos = articles.map((article) =>
         this.mapToArticleResponse(
-          article,
+          article as unknown as ArticleWithRelations,
           currentUserId,
           followingMap.get(article.author.id) ?? false,
         ),
@@ -473,10 +469,7 @@ export class ArticlesService {
         { excludeExtraneousValues: true },
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch articles: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new BadRequestException('Failed to fetch articles');
+      handlePrismaError(error as Error, 'findAll', this.logger);
     }
   }
 
@@ -526,43 +519,17 @@ export class ArticlesService {
           orderBy: { createdAt: 'desc' },
           skip: offset,
           take: limit,
-          include: {
-            author: {
-              select: {
-                id: true,
-                username: true,
-                bio: true,
-                avatar: true,
-              },
-            },
-            tags: {
-              include: {
-                tag: {
-                  select: {
-                    id: true,
-                    name: true,
-                    slug: true,
-                  },
-                },
-              },
-            },
-            favorites: {
-              where: { userId },
-              select: { userId: true },
-            },
-            _count: {
-              select: {
-                favorites: true,
-                comments: true,
-              },
-            },
-          },
+          include: this.getArticleIncludeConfig(userId),
         }),
       ]);
 
       // All authors are followed (by definition)
       const articleDtos = articles.map((article) =>
-        this.mapToArticleResponse(article, userId, true),
+        this.mapToArticleResponse(
+          article as unknown as ArticleWithRelations,
+          userId,
+          true,
+        ),
       );
 
       const pagination = this.createPaginationMeta(total, limit, offset);
@@ -576,10 +543,7 @@ export class ArticlesService {
         { excludeExtraneousValues: true },
       );
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch feed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new BadRequestException('Failed to fetch feed');
+      handlePrismaError(error as Error, 'getFeed', this.logger);
     }
   }
 
@@ -597,39 +561,7 @@ export class ArticlesService {
     try {
       const article = await this.prisma.article.findUnique({
         where: { slug },
-        include: {
-          author: {
-            select: {
-              id: true,
-              username: true,
-              bio: true,
-              avatar: true,
-            },
-          },
-          tags: {
-            include: {
-              tag: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                },
-              },
-            },
-          },
-          favorites: currentUserId
-            ? {
-                where: { userId: currentUserId },
-                select: { userId: true },
-              }
-            : false,
-          _count: {
-            select: {
-              favorites: true,
-              comments: true,
-            },
-          },
-        },
+        include: this.getArticleIncludeConfig(currentUserId),
       });
 
       if (!article) {
@@ -648,15 +580,13 @@ export class ArticlesService {
         isFollowing = !!follow;
       }
 
-      return this.mapToArticleResponse(article, currentUserId, isFollowing);
-    } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
-      this.logger.error(
-        `Failed to fetch article: ${error instanceof Error ? error.message : String(error)}`,
+      return this.mapToArticleResponse(
+        article as unknown as ArticleWithRelations,
+        currentUserId,
+        isFollowing,
       );
-      throw new BadRequestException('Failed to fetch article');
+    } catch (error) {
+      handlePrismaError(error as Error, 'findOne', this.logger);
     }
   }
 
@@ -666,6 +596,7 @@ export class ArticlesService {
    * @param updateDto - Update data
    * @param userId - Current user ID
    * @returns Updated article
+   * @throws BadRequestException if no fields are provided for update
    */
   async update(
     id: number,
@@ -674,18 +605,37 @@ export class ArticlesService {
   ): Promise<ArticleResponseDto> {
     const { title, description, body, tagList, isPublished } = updateDto;
 
-    try {
-      // Generate new slug if title changed
-      let newSlug: string | undefined;
-      if (title) {
-        newSlug = await this.generateUniqueSlugFromTitle(title);
-      }
+    // Validate that at least one field is provided for update
+    if (!hasAtLeastOneField(updateDto, ARTICLE_UPDATABLE_FIELDS)) {
+      throw new BadRequestException(
+        `At least one field (${ARTICLE_UPDATABLE_FIELDS.join(', ')}) must be provided for update`,
+      );
+    }
 
+    try {
       const result = await this.prisma.$transaction(
         async (tx) => {
+          // Fetch current article to get old slug before update
+          const currentArticle = await tx.article.findUnique({
+            where: { id },
+            select: { slug: true },
+          });
+
+          if (!currentArticle) {
+            throw new NotFoundException(`Article with id ${id} not found`);
+          }
+
+          const oldSlug = currentArticle.slug;
+
           // Build update data
           const updateData: Prisma.ArticleUpdateInput = {};
-          if (title && newSlug) {
+
+          // Generate new slug if title changed (within transaction for atomicity)
+          if (title) {
+            const newSlug = await this.generateUniqueSlugInTransaction(
+              tx,
+              title,
+            );
             updateData.title = title;
             updateData.slug = newSlug;
           }
@@ -697,33 +647,7 @@ export class ArticlesService {
           const article = await tx.article.update({
             where: { id },
             data: updateData,
-            include: {
-              author: {
-                select: {
-                  id: true,
-                  username: true,
-                  bio: true,
-                  avatar: true,
-                },
-              },
-              tags: {
-                include: {
-                  tag: {
-                    select: {
-                      id: true,
-                      name: true,
-                      slug: true,
-                    },
-                  },
-                },
-              },
-              _count: {
-                select: {
-                  favorites: true,
-                  comments: true,
-                },
-              },
-            },
+            include: this.getArticleIncludeConfig(userId),
           });
 
           // Update tags if provided
@@ -777,7 +701,8 @@ export class ArticlesService {
             }
           }
 
-          return article;
+          // Return old slug for cache invalidation
+          return { article, oldSlug };
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
@@ -785,20 +710,29 @@ export class ArticlesService {
       );
 
       // Invalidate caches outside transaction
-      await Promise.all([
-        this.invalidateArticleCaches(result.slug),
-        newSlug ? this.invalidateArticleCaches(newSlug) : Promise.resolve(),
+      const { article, oldSlug } = result;
+      const cacheInvalidations: Promise<void>[] = [
         this.tagsService.clearCache(),
-      ]);
+      ];
 
-      this.logger.log(`Updated article id=${id}, slug=${result.slug}`);
+      // Always invalidate old slug cache
+      cacheInvalidations.push(this.invalidateArticleCaches(oldSlug));
 
-      return this.mapToArticleResponse(result, userId);
-    } catch (error) {
-      this.logger.error(
-        `Failed to update article: ${error instanceof Error ? error.message : String(error)}`,
+      // Invalidate new slug cache if it changed
+      if (article.slug !== oldSlug) {
+        cacheInvalidations.push(this.invalidateArticleCaches(article.slug));
+      }
+
+      await Promise.all(cacheInvalidations);
+
+      this.logger.log(`Updated article id=${id}, slug=${article.slug}`);
+
+      return this.mapToArticleResponse(
+        article as unknown as ArticleWithRelations,
+        userId,
       );
-      throw new BadRequestException('Failed to update article');
+    } catch (error) {
+      handlePrismaError(error as Error, 'update', this.logger);
     }
   }
 
@@ -806,6 +740,8 @@ export class ArticlesService {
    * Delete article by id
    * @param id - Article id
    * @param slug - Article slug (for cache invalidation)
+   * @throws NotFoundException if article doesn't exist
+   * @throws InternalServerErrorException for unexpected errors
    */
   async delete(id: number, slug: string): Promise<void> {
     try {
@@ -822,10 +758,7 @@ export class ArticlesService {
 
       this.logger.log(`Deleted article id=${id}, slug=${slug}`);
     } catch (error) {
-      this.logger.error(
-        `Failed to delete article: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw new BadRequestException('Failed to delete article');
+      handlePrismaError(error as Error, 'delete', this.logger);
     }
   }
 }

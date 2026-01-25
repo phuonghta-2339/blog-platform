@@ -1,9 +1,6 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
-
-interface RequestWithUser {
-  user?: AuthenticatedUser;
-}
+import { RequestWithUser } from '../interfaces/request-with-user.interface';
 
 /**
  * Current User decorator

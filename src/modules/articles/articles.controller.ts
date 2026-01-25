@@ -5,7 +5,9 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  InternalServerErrorException,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -37,17 +39,7 @@ import { ArticleQueryDto } from './dto/article-query.dto';
 import { ArticleResponseDto } from './dto/article-response.dto';
 import { PaginatedArticlesDto } from './dto/paginated-articles.dto';
 import { ArticleAuthorGuard } from './guards/article-author.guard';
-
-/**
- * Request interface with article attached by guard
- */
-interface RequestWithArticle extends Request {
-  article?: {
-    id: number;
-    authorId: number;
-    slug: string;
-  };
-}
+import { RequestWithArticle } from './interfaces/request-with-article.interface';
 
 /**
  * Articles Controller
@@ -262,22 +254,19 @@ export class ArticlesController {
   @ApiNotFoundResponse({ description: 'Article not found' })
   @ApiBadRequestResponse({ description: 'Validation failed' })
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @Body() updateDto: UpdateArticleDto,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: RequestWithArticle,
   ): Promise<BaseResponseDto<ArticleResponseDto>> {
     // Guard has already verified article exists and attached it to request
-    const articleId = request.article?.id;
-    if (!articleId) {
-      throw new Error('Article not found in request after guard validation');
+    if (!request.article) {
+      throw new InternalServerErrorException(
+        'Article not found in request after guard validation',
+      );
     }
 
-    const data = await this.articlesService.update(
-      articleId,
-      updateDto,
-      user.id,
-    );
+    const data = await this.articlesService.update(id, updateDto, user.id);
     return { success: true, data };
   }
 
@@ -320,18 +309,19 @@ export class ArticlesController {
   })
   @ApiNotFoundResponse({ description: 'Article not found' })
   async delete(
-    @Param('id') id: string,
+    @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: AuthenticatedUser,
     @Req() request: RequestWithArticle,
   ): Promise<{ success: boolean; message: string }> {
     // Guard has already verified article exists and attached it to request
-    const articleId = request.article?.id;
     const articleSlug = request.article?.slug;
-    if (!articleId || !articleSlug) {
-      throw new Error('Article not found in request after guard validation');
+    if (!request.article || !articleSlug) {
+      throw new InternalServerErrorException(
+        'Article not found in request after guard validation',
+      );
     }
 
-    await this.articlesService.delete(articleId, articleSlug);
+    await this.articlesService.delete(id, articleSlug);
     return { success: true, message: 'Article deleted successfully' };
   }
 }

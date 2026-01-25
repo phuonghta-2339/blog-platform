@@ -19,7 +19,8 @@ import {
 
 /**
  * DTO for updating an existing article
- * All fields are optional
+ * All fields are optional, but at least one field must be provided for update
+ * Validation is performed in the service layer to ensure empty updates are rejected
  */
 export class UpdateArticleDto {
   @ApiProperty({
