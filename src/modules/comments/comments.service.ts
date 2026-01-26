@@ -339,45 +339,43 @@ export class CommentsService {
   async delete(articleId: number, commentId: number): Promise<void> {
     try {
       // Use transaction for atomic operations
-      await this.prisma
-        .$transaction(
-          async (tx) => {
-            // Get comment to retrieve articleId and validate
-            const comment = await tx.comment.findUnique({
-              where: { id: commentId },
-              select: { id: true, articleId: true },
-            });
+      const returnedArticleId = await this.prisma.$transaction(
+        async (tx) => {
+          // Get comment to retrieve articleId and validate
+          const comment = await tx.comment.findUnique({
+            where: { id: commentId },
+            select: { id: true, articleId: true },
+          });
 
-            if (!comment) {
-              throw new NotFoundException('Comment not found');
-            }
+          if (!comment) {
+            throw new NotFoundException('Comment not found');
+          }
 
-            // Validate route consistency: ensure comment belongs to the specified article
-            if (comment.articleId !== articleId) {
-              throw new NotFoundException('Comment not found for this article');
-            }
+          // Validate route consistency: ensure comment belongs to the specified article
+          if (comment.articleId !== articleId) {
+            throw new NotFoundException('Comment not found for this article');
+          }
 
-            // Delete comment
-            await tx.comment.delete({
-              where: { id: commentId },
-            });
+          // Delete comment
+          await tx.comment.delete({
+            where: { id: commentId },
+          });
 
-            // Decrement article commentsCount
-            await tx.article.update({
-              where: { id: comment.articleId },
-              data: { commentsCount: { decrement: 1 } },
-            });
+          // Decrement article commentsCount
+          await tx.article.update({
+            where: { id: comment.articleId },
+            data: { commentsCount: { decrement: 1 } },
+          });
 
-            return comment.articleId;
-          },
-          {
-            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-          },
-        )
-        .then(async (returnedArticleId) => {
-          // Invalidate caches after successful transaction
-          await this.invalidateCommentCaches(returnedArticleId);
-        });
+          return comment.articleId;
+        },
+        {
+          isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+        },
+      );
+
+      // Invalidate caches after successful transaction
+      await this.invalidateCommentCaches(returnedArticleId);
 
       this.logger.log(
         `Comment deleted: id=${commentId}, articleId=${articleId}`,

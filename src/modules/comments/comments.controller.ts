@@ -28,6 +28,7 @@ import {
 import { BaseResponseDto } from '@/common/dto/response.dto';
 import { CurrentUser } from '@modules/auth/decorators/current-user.decorator';
 import { Public } from '@modules/auth/decorators/public.decorator';
+import { OptionalJwtAuthGuard } from '@modules/auth/guards/optional-jwt-auth.guard';
 import { AuthenticatedUser } from '@modules/auth/interfaces/authenticated-user.interface';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
@@ -48,19 +49,20 @@ export class CommentsController {
 
   /**
    * Get list of comments for an article
-   * Public endpoint - accessible without authentication
+   * Public endpoint with optional authentication for personalization
    * @param articleId - Article ID
    * @param query - Query parameters (pagination)
-   * @param user - Current authenticated user (optional)
+   * @param user - Current authenticated user (optional, available if JWT provided)
    * @returns Paginated list of comments
    */
   @Get()
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Get list of comments for an article',
     description:
-      'Get paginated list of comments for a specific article. Public access.',
+      'Get paginated list of comments for a specific article. Public access with optional personalization for authenticated users.',
   })
   @ApiParam({
     name: 'id',

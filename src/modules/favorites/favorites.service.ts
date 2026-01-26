@@ -114,11 +114,25 @@ export class FavoritesService {
               error.code === 'P2002'
             ) {
               // Race condition: another request created the favorite first
-              // Return current state without incrementing (idempotent behavior)
+              // Re-fetch article to get current favoritesCount (not stale data)
+              const currentArticle = await tx.article.findUnique({
+                where: { id: articleId },
+                select: {
+                  slug: true,
+                  title: true,
+                  favoritesCount: true,
+                },
+              });
+
+              // If article was deleted between checks (rare edge case)
+              if (!currentArticle) {
+                throw new NotFoundException('Article not found');
+              }
+
               return {
-                slug: article.slug,
-                title: article.title,
-                favoritesCount: article.favoritesCount,
+                slug: currentArticle.slug,
+                title: currentArticle.title,
+                favoritesCount: currentArticle.favoritesCount,
                 favorited: true,
               };
             }
