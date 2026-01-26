@@ -207,7 +207,6 @@ export class CommentsController {
    * Author or admin only (protected by CommentAuthorGuard)
    * @param articleId - Article ID
    * @param commentId - Comment ID
-   * @param req - Request with attached comment info from guard
    * @returns Success message
    */
   @Delete(':commentId')
@@ -296,7 +295,7 @@ export class CommentsController {
     @Param('id', ParseIntPipe) articleId: number,
     @Param('commentId', ParseIntPipe) commentId: number,
   ): Promise<{ success: boolean; message: string }> {
-    await this.commentsService.delete(commentId);
+    await this.commentsService.delete(articleId, commentId);
     return { success: true, message: 'Comment deleted successfully' };
   }
 }

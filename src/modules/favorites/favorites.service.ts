@@ -80,51 +80,51 @@ export class FavoritesService {
             );
           }
 
-          // Check if already favorited (idempotent check)
-          const existingFavorite = await tx.favorite.findUnique({
-            where: {
-              unique_user_article_favorite: {
+          // Try to create favorite (concurrency-safe, idempotent)
+          // If concurrent request creates it first, catch P2002 and return current state
+          try {
+            await tx.favorite.create({
+              data: {
                 userId,
                 articleId,
               },
-            },
-          });
+            });
 
-          // If already favorited, return current state (idempotent)
-          if (existingFavorite) {
+            // Successfully created, increment article favoritesCount
+            const updatedArticle = await tx.article.update({
+              where: { id: articleId },
+              data: { favoritesCount: { increment: 1 } },
+              select: {
+                slug: true,
+                title: true,
+                favoritesCount: true,
+              },
+            });
+
             return {
-              slug: article.slug,
-              title: article.title,
-              favoritesCount: article.favoritesCount,
+              slug: updatedArticle.slug,
+              title: updatedArticle.title,
+              favoritesCount: updatedArticle.favoritesCount,
               favorited: true,
             };
+          } catch (error) {
+            // Handle unique constraint violation (P2002): already favorited
+            if (
+              error instanceof Prisma.PrismaClientKnownRequestError &&
+              error.code === 'P2002'
+            ) {
+              // Race condition: another request created the favorite first
+              // Return current state without incrementing (idempotent behavior)
+              return {
+                slug: article.slug,
+                title: article.title,
+                favoritesCount: article.favoritesCount,
+                favorited: true,
+              };
+            }
+            // Re-throw other errors
+            throw error;
           }
-
-          // Create favorite
-          await tx.favorite.create({
-            data: {
-              userId,
-              articleId,
-            },
-          });
-
-          // Increment article favoritesCount
-          const updatedArticle = await tx.article.update({
-            where: { id: articleId },
-            data: { favoritesCount: { increment: 1 } },
-            select: {
-              slug: true,
-              title: true,
-              favoritesCount: true,
-            },
-          });
-
-          return {
-            slug: updatedArticle.slug,
-            title: updatedArticle.title,
-            favoritesCount: updatedArticle.favoritesCount,
-            favorited: true,
-          };
         },
         {
           isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
@@ -180,51 +180,45 @@ export class FavoritesService {
             throw new NotFoundException('Article not found');
           }
 
-          // Check if favorited (idempotent check)
-          const existingFavorite = await tx.favorite.findUnique({
+          // Delete favorite using deleteMany (concurrency-safe, idempotent)
+          // deleteMany returns count=0 if not found, no P2025 error thrown
+          const { count: deletedCount } = await tx.favorite.deleteMany({
             where: {
-              unique_user_article_favorite: {
-                userId,
-                articleId,
-              },
+              userId,
+              articleId,
             },
           });
 
-          // If not favorited, return current state (idempotent)
-          if (!existingFavorite) {
-            return {
+          // Only decrement count if actually deleted (handles race conditions & idempotency)
+          let finalArticle: {
+            slug: string;
+            title: string;
+            favoritesCount: number;
+          };
+          if (deletedCount > 0) {
+            const updated = await tx.article.update({
+              where: { id: articleId },
+              data: { favoritesCount: { decrement: 1 } },
+              select: {
+                slug: true,
+                title: true,
+                favoritesCount: true,
+              },
+            });
+            finalArticle = updated;
+          } else {
+            // Not favorited or race condition: use current article state
+            finalArticle = {
               slug: article.slug,
               title: article.title,
               favoritesCount: article.favoritesCount,
-              favorited: false,
             };
           }
 
-          // Delete favorite
-          await tx.favorite.delete({
-            where: {
-              unique_user_article_favorite: {
-                userId,
-                articleId,
-              },
-            },
-          });
-
-          // Decrement article favoritesCount
-          const updatedArticle = await tx.article.update({
-            where: { id: articleId },
-            data: { favoritesCount: { decrement: 1 } },
-            select: {
-              slug: true,
-              title: true,
-              favoritesCount: true,
-            },
-          });
-
           return {
-            slug: updatedArticle.slug,
-            title: updatedArticle.title,
-            favoritesCount: updatedArticle.favoritesCount,
+            slug: finalArticle.slug,
+            title: finalArticle.title,
+            favoritesCount: finalArticle.favoritesCount,
             favorited: false,
           };
         },

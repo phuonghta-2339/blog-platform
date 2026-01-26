@@ -27,6 +27,7 @@ export class CommentAuthorGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestWithComment>();
     const user = request.user;
     const commentIdParam = request.params.commentId;
+    const articleIdParam = request.params.id;
 
     if (!user) {
       throw new ForbiddenException('Authentication required');
@@ -38,6 +39,12 @@ export class CommentAuthorGuard implements CanActivate {
       throw new BadRequestException('Invalid comment ID');
     }
 
+    // Parse and validate articleId parameter
+    const articleId = parseInt(articleIdParam, 10);
+    if (isNaN(articleId) || articleId <= 0) {
+      throw new BadRequestException('Invalid article ID');
+    }
+
     // Check if comment exists and get id + authorId + articleId
     const comment = await this.prisma.comment.findUnique({
       where: { id: commentId },
@@ -46,6 +53,11 @@ export class CommentAuthorGuard implements CanActivate {
 
     if (!comment) {
       throw new NotFoundException('Comment not found');
+    }
+
+    // Validate route consistency: ensure comment belongs to the specified article
+    if (comment.articleId !== articleId) {
+      throw new NotFoundException('Comment not found for this article');
     }
 
     // Admin can delete any comment

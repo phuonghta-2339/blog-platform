@@ -11,7 +11,6 @@ import { Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '@/database/prisma.service';
 import { deleteCacheByPattern } from '@/common/helpers/cache.helper';
-import { ArticlesService } from '@modules/articles/articles.service';
 import { CommentWithRelations } from './types/comment-with-relations.type';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentQueryDto } from './dto/comment-query.dto';
@@ -35,7 +34,6 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-    private readonly articlesService: ArticlesService,
   ) {}
 
   /**
@@ -223,12 +221,18 @@ export class CommentsService {
     const { limit, offset } = queryDto;
 
     try {
-      // Batch 1: Check article + count + fetch comments in parallel
-      const [article, total, comments] = await Promise.all([
-        this.prisma.article.findUnique({
-          where: { id: articleId },
-          select: { id: true },
-        }),
+      // Step 1: Check article existence first (fail-fast to avoid unnecessary queries)
+      const article = await this.prisma.article.findUnique({
+        where: { id: articleId },
+        select: { id: true },
+      });
+
+      if (!article) {
+        throw new NotFoundException('Article not found');
+      }
+
+      // Step 2: Fetch count + comments in parallel (only after article validation)
+      const [total, comments] = await Promise.all([
         this.prisma.comment.count({
           where: { articleId },
         }),
@@ -241,11 +245,7 @@ export class CommentsService {
         }),
       ]);
 
-      if (!article) {
-        throw new NotFoundException('Article not found');
-      }
-
-      // Batch 2: Get following statuses if needed (only if user authenticated and comments exist)
+      // Step 3: Get following statuses if needed (only if user authenticated and comments exist)
       let followingMap = new Map<number, boolean>();
       if (currentUserId && comments.length > 0) {
         // Extract unique author IDs (using Set for deduplication)
@@ -331,16 +331,18 @@ export class CommentsService {
   /**
    * Delete a comment
    * Uses transaction to atomically decrement article.commentsCount
+   * Validates route consistency by ensuring comment belongs to specified article
+   * @param articleId - Article ID (for route validation)
    * @param commentId - Comment ID
    * @returns void
    */
-  async delete(commentId: number): Promise<void> {
+  async delete(articleId: number, commentId: number): Promise<void> {
     try {
       // Use transaction for atomic operations
       await this.prisma
         .$transaction(
           async (tx) => {
-            // Get comment to retrieve articleId
+            // Get comment to retrieve articleId and validate
             const comment = await tx.comment.findUnique({
               where: { id: commentId },
               select: { id: true, articleId: true },
@@ -348,6 +350,11 @@ export class CommentsService {
 
             if (!comment) {
               throw new NotFoundException('Comment not found');
+            }
+
+            // Validate route consistency: ensure comment belongs to the specified article
+            if (comment.articleId !== articleId) {
+              throw new NotFoundException('Comment not found for this article');
             }
 
             // Delete comment
@@ -367,15 +374,17 @@ export class CommentsService {
             isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
           },
         )
-        .then(async (articleId) => {
+        .then(async (returnedArticleId) => {
           // Invalidate caches after successful transaction
-          await this.invalidateCommentCaches(articleId);
+          await this.invalidateCommentCaches(returnedArticleId);
         });
 
-      this.logger.log(`Comment deleted: id=${commentId}`);
+      this.logger.log(
+        `Comment deleted: id=${commentId}, articleId=${articleId}`,
+      );
     } catch (error) {
       this.logger.error(
-        `Failed to delete comment: id=${commentId}`,
+        `Failed to delete comment: id=${commentId}, articleId=${articleId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw error;
