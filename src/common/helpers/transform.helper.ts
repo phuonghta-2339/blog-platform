@@ -31,3 +31,31 @@ export function transformToTrimmedOrNull(value: unknown): unknown {
   const trimmed = value.trim();
   return trimmed || null;
 }
+
+/**
+ * Transform value to number or use default if undefined
+ * Used for pagination limit and offset transformations
+ * @param defaultValue - Default value to use if value is undefined
+ * @returns Transform function that returns number
+ */
+export function transformNumberWithDefault(
+  defaultValue: number,
+): (params: { value: unknown }) => number {
+  return ({ value }) => {
+    return value === undefined ? defaultValue : Number(value);
+  };
+}
+
+/**
+ * Transform value to enum or use default if undefined
+ * Used for enum field transformations
+ * @param defaultValue - Default value to use if value is undefined
+ * @returns Transform function
+ */
+export function transformEnumWithDefault<T>(
+  defaultValue: T,
+): (params: { value: unknown }) => T {
+  return ({ value }) => {
+    return value === undefined ? defaultValue : (value as T);
+  };
+}

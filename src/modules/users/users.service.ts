@@ -14,6 +14,7 @@ import { PrismaService } from '@/database/prisma.service';
 import { CacheKeys } from '@/common/cache/cache.config';
 import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
 import { CACHE_TTL } from '@/common/constants/cache';
+import { handlePrismaError } from '@/common/helpers/database.helper';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PublicProfileDto } from './dto/public-profile.dto';
@@ -202,7 +203,7 @@ export class UsersService {
 
       return this.mapToUserResponse(user);
     } catch (error) {
-      // Handle unique constraint violations
+      // Handle unique constraint violations for better user messages
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
@@ -220,16 +221,8 @@ export class UsersService {
         throw new BadRequestException('Update failed: duplicate entry');
       }
 
-      // Handle record not found (P2025)
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      ) {
-        throw new NotFoundException('User not found');
-      }
-
-      // Re-throw other errors
-      throw error;
+      // Use centralized error handler for other Prisma errors
+      handlePrismaError(error as Error, 'updateProfile', this.logger);
     }
   }
 
