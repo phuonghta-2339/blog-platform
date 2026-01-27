@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '@/database/database.module';
+import { FollowsModule } from '@modules/follows/follows.module';
 import { UsersService } from './users.service';
 import { UsersController, ProfilesController } from './users.controller';
 
@@ -8,7 +9,7 @@ import { UsersController, ProfilesController } from './users.controller';
  * Manages user profile operations and public profiles
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, forwardRef(() => FollowsModule)],
   controllers: [UsersController, ProfilesController],
   providers: [UsersService],
   exports: [UsersService],

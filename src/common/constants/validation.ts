@@ -59,3 +59,17 @@ export const ARTICLE_UPDATABLE_FIELDS = [
  */
 export const COMMENT_BODY_MIN_LENGTH = 1;
 export const COMMENT_BODY_MAX_LENGTH = 2000;
+
+/**
+ * Sort order options for listings
+ * Common enum used across all modules for consistent sorting behavior
+ */
+export enum SortOrder {
+  ASC = 'asc',
+  DESC = 'desc',
+}
+
+/**
+ * Default sort order for listings
+ */
+export const DEFAULT_SORT_ORDER = SortOrder.DESC;

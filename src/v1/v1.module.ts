@@ -7,6 +7,7 @@ import { TagsModule } from '@modules/tags/tags.module';
 import { ArticlesModule } from '@modules/articles/articles.module';
 import { CommentsModule } from '@modules/comments/comments.module';
 import { FavoritesModule } from '@modules/favorites/favorites.module';
+import { FollowsModule } from '@modules/follows/follows.module';
 
 /**
  * V1 Module - Contains all version 1 API endpoints
@@ -20,6 +21,7 @@ import { FavoritesModule } from '@modules/favorites/favorites.module';
     ArticlesModule,
     CommentsModule,
     FavoritesModule,
+    FollowsModule,
   ],
   controllers: [ApiController],
   providers: [ApiService],

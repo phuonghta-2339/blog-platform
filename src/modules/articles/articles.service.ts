@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -19,16 +20,14 @@ import { MAX_QUERY_RETRIES } from '@/common/constants/database';
 import {
   ARTICLE_TITLE_MAX_LENGTH,
   ARTICLE_UPDATABLE_FIELDS,
+  SortOrder,
 } from '@/common/constants/validation';
 import { TagsService } from '@modules/tags/tags.service';
+import { FollowsService } from '@modules/follows/follows.service';
 import { ArticleWithRelations } from './types/article-with-relations.type';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
-import {
-  ArticleQueryDto,
-  ArticleSortBy,
-  SortOrder,
-} from './dto/article-query.dto';
+import { ArticleQueryDto, ArticleSortBy } from './dto/article-query.dto';
 import {
   ArticleResponseDto,
   ArticleTagDto,
@@ -51,6 +50,8 @@ export class ArticlesService {
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     private readonly tagsService: TagsService,
+    @Inject(forwardRef(() => FollowsService))
+    private readonly followsService: FollowsService,
   ) {}
 
   /**
@@ -567,6 +568,7 @@ export class ArticlesService {
 
   /**
    * Get personal feed from followed users
+   * Uses FollowsService for cached followed user IDs
    * @param userId - Current user ID
    * @param limit - Items per page
    * @param offset - Items to skip
@@ -578,13 +580,9 @@ export class ArticlesService {
     offset = 0,
   ): Promise<PaginatedArticlesDto> {
     try {
-      // Get followed user IDs with minimal select
-      const followings = await this.prisma.follow.findMany({
-        where: { followerId: userId },
-        select: { followingId: true },
-      });
-
-      const followedUserIds = followings.map((f) => f.followingId);
+      // Get followed user IDs (cached in FollowsService)
+      const followedUserIds =
+        await this.followsService.getFollowedUserIds(userId);
 
       // Early return if no followings - saves 2 expensive queries
       if (followedUserIds.length === 0) {

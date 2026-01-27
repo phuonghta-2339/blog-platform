@@ -7,6 +7,8 @@ import {
   PAGINATION_LIMIT_DEFAULT,
   PAGINATION_OFFSET_MIN,
   PAGINATION_OFFSET_DEFAULT,
+  SortOrder,
+  DEFAULT_SORT_ORDER,
 } from '@common/constants/validation';
 import {
   transformNumberWithDefault,
@@ -14,15 +16,7 @@ import {
 } from '@common/helpers/transform.helper';
 
 /**
- * Sort order enum
- */
-export enum SortOrder {
-  ASC = 'asc',
-  DESC = 'desc',
-}
-
-/**
- * Sort field enum
+ * Sort field enum for articles
  */
 export enum ArticleSortBy {
   CREATED_AT = 'createdAt',
@@ -105,13 +99,13 @@ export class ArticleQueryDto {
 
   @ApiProperty({
     description: 'Sort order',
-    example: 'desc',
+    example: DEFAULT_SORT_ORDER,
     enum: SortOrder,
-    default: SortOrder.DESC,
+    default: DEFAULT_SORT_ORDER,
     required: false,
   })
-  @Transform(transformEnumWithDefault(SortOrder.DESC))
+  @Transform(transformEnumWithDefault(DEFAULT_SORT_ORDER))
   @IsEnum(SortOrder)
   @IsOptional()
-  order?: SortOrder = SortOrder.DESC;
+  order?: SortOrder = DEFAULT_SORT_ORDER;
 }
