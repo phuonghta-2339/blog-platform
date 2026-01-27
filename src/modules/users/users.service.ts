@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -15,6 +16,7 @@ import { CacheKeys } from '@/common/cache/cache.config';
 import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
 import { CACHE_TTL } from '@/common/constants/cache';
 import { handlePrismaError } from '@/common/helpers/database.helper';
+import { FollowsService } from '@modules/follows/follows.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PublicProfileDto } from './dto/public-profile.dto';
@@ -30,6 +32,8 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    @Inject(forwardRef(() => FollowsService))
+    private readonly followsService: FollowsService,
   ) {}
 
   /**
@@ -100,7 +104,7 @@ export class UsersService {
    */
   async getProfile(userId: number): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId, isActive: true },
+      where: { id: userId },
       include: {
         _count: {
           select: {
@@ -112,7 +116,7 @@ export class UsersService {
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new NotFoundException('User not found');
     }
 
@@ -151,11 +155,11 @@ export class UsersService {
     // Verify currentPassword if provided
     if (currentPassword) {
       const user = await this.prisma.user.findUnique({
-        where: { id: userId, isActive: true },
-        select: { password: true },
+        where: { id: userId },
+        select: { password: true, isActive: true },
       });
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('User not found');
       }
 
@@ -183,7 +187,7 @@ export class UsersService {
         : null;
 
       const user = await this.prisma.user.update({
-        where: { id: userId, isActive: true },
+        where: { id: userId },
         data,
         include: {
           _count: {
@@ -195,6 +199,11 @@ export class UsersService {
           },
         },
       });
+
+      // Verify user is still active after update
+      if (!user.isActive) {
+        throw new NotFoundException('User not found');
+      }
 
       // Invalidate cache AFTER successful database update to prevent race condition
       if (updateData.username) {
@@ -255,12 +264,13 @@ export class UsersService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { username, isActive: true },
+      where: { username },
       select: {
         id: true,
         username: true,
         bio: true,
         avatar: true,
+        isActive: true,
         _count: {
           select: {
             followers: true,
@@ -270,20 +280,14 @@ export class UsersService {
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new NotFoundException(`User with username '${username}' not found`);
     }
 
     // Check if current user is following this profile
     let following = false;
     if (currentUserId && currentUserId !== user.id) {
-      const followRecord = await this.prisma.follow.findFirst({
-        where: {
-          followerId: currentUserId,
-          followingId: user.id,
-        },
-      });
-      following = !!followRecord;
+      following = await this.followsService.isFollowing(currentUserId, user.id);
     }
 
     const profile = plainToInstance(
@@ -314,9 +318,10 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findById(id: number): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { id, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -326,9 +331,10 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { email },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -338,8 +344,62 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findByUsername(username: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { username, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { username },
     });
+    return user?.isActive ? user : null;
+  }
+
+  /**
+   * Get user profile fields by username
+   * Optimized for follows and profile operations - only fetches needed fields
+   * @param username - Username to look up
+   * @returns User profile fields or null if not found/inactive
+   */
+  async getUserProfileByUsername(username: string): Promise<{
+    id: number;
+    username: string;
+    bio: string | null;
+    avatar: string | null;
+  } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: {
+        id: true,
+        username: true,
+        bio: true,
+        avatar: true,
+        isActive: true,
+      },
+    });
+    return user?.isActive ? user : null;
+  }
+
+  /**
+   * Get user ID by username
+   * Lightweight query for operations that only need to verify user exists
+   * @param username - Username to look up
+   * @returns User ID object or null if not found/inactive
+   */
+  async getUserIdByUsername(username: string): Promise<{ id: number } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true, isActive: true },
+    });
+    return user?.isActive ? { id: user.id } : null;
+  }
+
+  /**
+   * Get username by user ID
+   * Lightweight query for cache key generation and logging
+   * @param userId - User ID to look up
+   * @returns Username object or null if not found/inactive
+   */
+  async getUsernameById(userId: number): Promise<{ username: string } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, isActive: true },
+    });
+    return user?.isActive ? { username: user.username } : null;
   }
 }
