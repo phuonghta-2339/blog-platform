@@ -1,12 +1,8 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '@/database/prisma.service';
+import { ArticlesService } from '@modules/articles/articles.service';
 import { ArticleSummaryDto } from './dto/article-summary.dto';
 import { FavoriteResponseDto } from './dto/favorite-response.dto';
 
@@ -19,7 +15,10 @@ import { FavoriteResponseDto } from './dto/favorite-response.dto';
 export class FavoritesService {
   private readonly logger = new Logger(FavoritesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly articlesService: ArticlesService,
+  ) {}
 
   /**
    * Map article data to ArticleSummaryDto
@@ -58,27 +57,11 @@ export class FavoritesService {
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
-          // Check if article exists and is published
-          const article = await tx.article.findUnique({
-            where: { id: articleId },
-            select: {
-              id: true,
-              slug: true,
-              title: true,
-              isPublished: true,
-              favoritesCount: true,
-            },
-          });
-
-          if (!article) {
-            throw new NotFoundException('Article not found');
-          }
-
-          if (!article.isPublished) {
-            throw new BadRequestException(
-              'Cannot favorite unpublished articles',
-            );
-          }
+          // Validate article exists and is published (specialized method for clarity)
+          await this.articlesService.validateArticlePublishedById(
+            articleId,
+            tx,
+          );
 
           // Try to create favorite (concurrency-safe, idempotent)
           // If concurrent request creates it first, catch P2002 and return current state
@@ -114,20 +97,9 @@ export class FavoritesService {
               error.code === 'P2002'
             ) {
               // Race condition: another request created the favorite first
-              // Re-fetch article to get current favoritesCount (not stale data)
-              const currentArticle = await tx.article.findUnique({
-                where: { id: articleId },
-                select: {
-                  slug: true,
-                  title: true,
-                  favoritesCount: true,
-                },
-              });
-
-              // If article was deleted between checks (rare edge case)
-              if (!currentArticle) {
-                throw new NotFoundException('Article not found');
-              }
+              // Get current article summary (specialized method for common fields)
+              const currentArticle =
+                await this.articlesService.getArticleSummaryById(articleId, tx);
 
               return {
                 slug: currentArticle.slug,
@@ -179,20 +151,11 @@ export class FavoritesService {
     try {
       const result = await this.prisma.$transaction(
         async (tx) => {
-          // Check if article exists
-          const article = await tx.article.findUnique({
-            where: { id: articleId },
-            select: {
-              id: true,
-              slug: true,
-              title: true,
-              favoritesCount: true,
-            },
-          });
-
-          if (!article) {
-            throw new NotFoundException('Article not found');
-          }
+          // Get article summary (specialized method for common fields)
+          const article = await this.articlesService.getArticleSummaryById(
+            articleId,
+            tx,
+          );
 
           // Delete favorite using deleteMany (concurrency-safe, idempotent)
           // deleteMany returns count=0 if not found, no P2025 error thrown

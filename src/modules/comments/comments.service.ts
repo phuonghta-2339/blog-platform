@@ -1,16 +1,11 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
 import { PrismaService } from '@/database/prisma.service';
 import { deleteCacheByPattern } from '@/common/helpers/cache.helper';
+import { ArticlesService } from '@modules/articles/articles.service';
 import { CommentWithRelations } from './types/comment-with-relations.type';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CommentQueryDto } from './dto/comment-query.dto';
@@ -34,6 +29,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly articlesService: ArticlesService,
   ) {}
 
   /**
@@ -150,21 +146,11 @@ export class CommentsService {
       // Use transaction for atomic operations
       const comment = await this.prisma.$transaction(
         async (tx) => {
-          // Check if article exists and is published
-          const article = await tx.article.findUnique({
-            where: { id: articleId },
-            select: { id: true, isPublished: true },
-          });
-
-          if (!article) {
-            throw new NotFoundException('Article not found');
-          }
-
-          if (!article.isPublished) {
-            throw new BadRequestException(
-              'Cannot comment on unpublished articles',
-            );
-          }
+          // Validate article exists and is published (specialized method for clarity)
+          await this.articlesService.validateArticlePublishedById(
+            articleId,
+            tx,
+          );
 
           // Create comment
           const newComment = await tx.comment.create({
@@ -221,15 +207,8 @@ export class CommentsService {
     const { limit, offset } = queryDto;
 
     try {
-      // Step 1: Check article existence first (fail-fast to avoid unnecessary queries)
-      const article = await this.prisma.article.findUnique({
-        where: { id: articleId },
-        select: { id: true },
-      });
-
-      if (!article) {
-        throw new NotFoundException('Article not found');
-      }
+      // Step 1: Validate article exists (specialized method for minimal check)
+      await this.articlesService.validateArticleExistsById(articleId);
 
       // Step 2: Fetch count + comments in parallel (only after article validation)
       const [total, comments] = await Promise.all([

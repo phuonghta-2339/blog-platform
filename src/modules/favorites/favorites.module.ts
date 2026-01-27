@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@/database/database.module';
+import { ArticlesModule } from '@modules/articles/articles.module';
 import { FavoritesService } from './favorites.service';
 import { FavoritesController } from './favorites.controller';
 
@@ -8,7 +9,7 @@ import { FavoritesController } from './favorites.controller';
  * Manages favorite/unfavorite operations with idempotent design
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ArticlesModule],
   controllers: [FavoritesController],
   providers: [FavoritesService],
   exports: [FavoritesService],
