@@ -16,6 +16,7 @@ import { CACHE_TTL } from '@/common/constants/cache';
 import { handlePrismaError } from '@/common/helpers/database.helper';
 import { SortOrder } from '@common/constants/validation';
 import { UsersService } from '@modules/users/users.service';
+import { UserProfileData } from '@modules/users/types/user-profile.type';
 import { ProfileDto } from './dto/profile.dto';
 import { FollowResponseDto } from './dto/follow-response.dto';
 import { FollowListQueryDto } from './dto/follow-list-query.dto';
@@ -93,6 +94,122 @@ export class FollowsService {
     await this.cacheManager.del(cacheKey);
     this.logger.debug(
       `Invalidated following status cache for ${followerId} -> ${followingId}`,
+    );
+  }
+
+  /**
+   * Get followers or following list with pagination (shared logic)
+   * @param username - Username to get list for
+   * @param currentUserId - Current user ID (for following status)
+   * @param query - Pagination and sorting options
+   * @param role - Whether to get 'followers' or 'following'
+   * @returns Paginated list of profiles
+   * @throws NotFoundException if user not found
+   */
+  private async getFollowList(
+    username: string,
+    currentUserId: number,
+    query: FollowListQueryDto,
+    role: 'followers' | 'following',
+  ): Promise<PaginatedFollowsDto> {
+    this.logger.debug(`Getting ${role} for ${username}`);
+
+    // Verify target user exists
+    const targetUser = await this.usersService.getUserIdByUsername(username);
+
+    if (!targetUser) {
+      throw new NotFoundException(`User '${username}' not found`);
+    }
+
+    // Build where clause based on role
+    const whereClause =
+      role === 'followers'
+        ? { followingId: targetUser.id }
+        : { followerId: targetUser.id };
+
+    // Count total
+    const total = await this.prisma.follow.count({ where: whereClause });
+
+    if (total === 0) {
+      return plainToInstance(
+        PaginatedFollowsDto,
+        {
+          profiles: [],
+          pagination: {
+            total: 0,
+            limit: query.limit,
+            offset: query.offset,
+            hasNext: false,
+          },
+        },
+        { excludeExtraneousValues: true },
+      );
+    }
+
+    // Role-based configuration for query
+    const relationField = role === 'followers' ? 'follower' : 'following';
+
+    // Select user fields
+    const userSelect = {
+      id: true,
+      username: true,
+      bio: true,
+      avatar: true,
+      _count: {
+        select: { followers: true },
+      },
+    } as const;
+
+    // Get list with user data using role-based relation
+    const follows = await this.prisma.follow.findMany({
+      where: whereClause,
+      select: {
+        [relationField]: {
+          select: userSelect,
+        },
+      },
+      orderBy: {
+        createdAt: query.order === SortOrder.ASC ? 'asc' : 'desc',
+      },
+      skip: query.offset,
+      take: query.limit,
+    });
+
+    // Extract users from relation field with type-safe casting
+    const users = follows.map((f) => {
+      // TypeScript needs explicit casting for computed property access
+      const record = f as Record<string, UserProfileData>;
+      return record[relationField];
+    });
+
+    // Extract user IDs for batch following status check
+    const userIds = users.map((u) => u.id);
+
+    // Batch check following status
+    const followingStatuses = await this.batchCheckFollowing(
+      currentUserId,
+      userIds,
+    );
+
+    // Map to ProfileDto with following status
+    const profiles = users.map((user) =>
+      this.mapToProfileDto(user, followingStatuses[user.id] ?? false),
+    );
+
+    const hasNext = query.offset + query.limit < total;
+
+    return plainToInstance(
+      PaginatedFollowsDto,
+      {
+        profiles,
+        pagination: {
+          total,
+          limit: query.limit,
+          offset: query.offset,
+          hasNext,
+        },
+      },
+      { excludeExtraneousValues: true },
     );
   }
 
@@ -310,91 +427,7 @@ export class FollowsService {
     currentUserId: number,
     query: FollowListQueryDto,
   ): Promise<PaginatedFollowsDto> {
-    this.logger.debug(`Getting followers for ${username}`);
-
-    // Verify target user exists
-    const targetUser = await this.usersService.getUserIdByUsername(username);
-
-    if (!targetUser) {
-      throw new NotFoundException(`User '${username}' not found`);
-    }
-
-    // Count total followers
-    const total = await this.prisma.follow.count({
-      where: { followingId: targetUser.id },
-    });
-
-    if (total === 0) {
-      return plainToInstance(
-        PaginatedFollowsDto,
-        {
-          profiles: [],
-          pagination: {
-            total: 0,
-            limit: query.limit,
-            offset: query.offset,
-            hasNext: false,
-          },
-        },
-        { excludeExtraneousValues: true },
-      );
-    }
-
-    // Get followers with user data
-    const follows = await this.prisma.follow.findMany({
-      where: { followingId: targetUser.id },
-      select: {
-        follower: {
-          select: {
-            id: true,
-            username: true,
-            bio: true,
-            avatar: true,
-            _count: {
-              select: { followers: true },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: query.order === SortOrder.ASC ? 'asc' : 'desc',
-      },
-      skip: query.offset,
-      take: query.limit,
-    });
-
-    // Extract follower IDs for batch following status check
-    const followerIds = follows.map((f) => f.follower.id);
-
-    // Batch check following status
-    const followingStatuses = await this.batchCheckFollowing(
-      currentUserId,
-      followerIds,
-    );
-
-    // Map to ProfileDto with following status
-    const profiles = follows.map((follow) =>
-      this.mapToProfileDto(
-        follow.follower,
-        followingStatuses[follow.follower.id] ?? false,
-      ),
-    );
-
-    const hasNext = query.offset + query.limit < total;
-
-    return plainToInstance(
-      PaginatedFollowsDto,
-      {
-        profiles,
-        pagination: {
-          total,
-          limit: query.limit,
-          offset: query.offset,
-          hasNext,
-        },
-      },
-      { excludeExtraneousValues: true },
-    );
+    return this.getFollowList(username, currentUserId, query, 'followers');
   }
 
   /**
@@ -410,91 +443,7 @@ export class FollowsService {
     currentUserId: number,
     query: FollowListQueryDto,
   ): Promise<PaginatedFollowsDto> {
-    this.logger.debug(`Getting following for ${username}`);
-
-    // Verify target user exists
-    const targetUser = await this.usersService.getUserIdByUsername(username);
-
-    if (!targetUser) {
-      throw new NotFoundException(`User '${username}' not found`);
-    }
-
-    // Count total following
-    const total = await this.prisma.follow.count({
-      where: { followerId: targetUser.id },
-    });
-
-    if (total === 0) {
-      return plainToInstance(
-        PaginatedFollowsDto,
-        {
-          profiles: [],
-          pagination: {
-            total: 0,
-            limit: query.limit,
-            offset: query.offset,
-            hasNext: false,
-          },
-        },
-        { excludeExtraneousValues: true },
-      );
-    }
-
-    // Get following with user data
-    const follows = await this.prisma.follow.findMany({
-      where: { followerId: targetUser.id },
-      select: {
-        following: {
-          select: {
-            id: true,
-            username: true,
-            bio: true,
-            avatar: true,
-            _count: {
-              select: { followers: true },
-            },
-          },
-        },
-      },
-      orderBy: {
-        createdAt: query.order === SortOrder.ASC ? 'asc' : 'desc',
-      },
-      skip: query.offset,
-      take: query.limit,
-    });
-
-    // Extract following IDs for batch following status check
-    const followingIds = follows.map((f) => f.following.id);
-
-    // Batch check following status
-    const followingStatuses = await this.batchCheckFollowing(
-      currentUserId,
-      followingIds,
-    );
-
-    // Map to ProfileDto with following status
-    const profiles = follows.map((follow) =>
-      this.mapToProfileDto(
-        follow.following,
-        followingStatuses[follow.following.id] ?? false,
-      ),
-    );
-
-    const hasNext = query.offset + query.limit < total;
-
-    return plainToInstance(
-      PaginatedFollowsDto,
-      {
-        profiles,
-        pagination: {
-          total,
-          limit: query.limit,
-          offset: query.offset,
-          hasNext,
-        },
-      },
-      { excludeExtraneousValues: true },
-    );
+    return this.getFollowList(username, currentUserId, query, 'following');
   }
 
   /**

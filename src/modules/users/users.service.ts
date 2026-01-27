@@ -104,7 +104,7 @@ export class UsersService {
    */
   async getProfile(userId: number): Promise<UserResponseDto> {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId, isActive: true },
+      where: { id: userId },
       include: {
         _count: {
           select: {
@@ -116,7 +116,7 @@ export class UsersService {
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new NotFoundException('User not found');
     }
 
@@ -155,11 +155,11 @@ export class UsersService {
     // Verify currentPassword if provided
     if (currentPassword) {
       const user = await this.prisma.user.findUnique({
-        where: { id: userId, isActive: true },
-        select: { password: true },
+        where: { id: userId },
+        select: { password: true, isActive: true },
       });
 
-      if (!user) {
+      if (!user || !user.isActive) {
         throw new NotFoundException('User not found');
       }
 
@@ -187,7 +187,7 @@ export class UsersService {
         : null;
 
       const user = await this.prisma.user.update({
-        where: { id: userId, isActive: true },
+        where: { id: userId },
         data,
         include: {
           _count: {
@@ -199,6 +199,11 @@ export class UsersService {
           },
         },
       });
+
+      // Verify user is still active after update
+      if (!user.isActive) {
+        throw new NotFoundException('User not found');
+      }
 
       // Invalidate cache AFTER successful database update to prevent race condition
       if (updateData.username) {
@@ -259,12 +264,13 @@ export class UsersService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { username, isActive: true },
+      where: { username },
       select: {
         id: true,
         username: true,
         bio: true,
         avatar: true,
+        isActive: true,
         _count: {
           select: {
             followers: true,
@@ -274,7 +280,7 @@ export class UsersService {
       },
     });
 
-    if (!user) {
+    if (!user || !user.isActive) {
       throw new NotFoundException(`User with username '${username}' not found`);
     }
 
@@ -312,9 +318,10 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findById(id: number): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { id, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -324,9 +331,10 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { email },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -336,9 +344,10 @@ export class UsersService {
    * @returns User entity or null if not found/inactive
    */
   async findByUsername(username: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { username, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { username },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -353,15 +362,17 @@ export class UsersService {
     bio: string | null;
     avatar: string | null;
   } | null> {
-    return this.prisma.user.findUnique({
-      where: { username, isActive: true },
+    const user = await this.prisma.user.findUnique({
+      where: { username },
       select: {
         id: true,
         username: true,
         bio: true,
         avatar: true,
+        isActive: true,
       },
     });
+    return user?.isActive ? user : null;
   }
 
   /**
@@ -371,10 +382,11 @@ export class UsersService {
    * @returns User ID object or null if not found/inactive
    */
   async getUserIdByUsername(username: string): Promise<{ id: number } | null> {
-    return this.prisma.user.findUnique({
-      where: { username, isActive: true },
-      select: { id: true },
+    const user = await this.prisma.user.findUnique({
+      where: { username },
+      select: { id: true, isActive: true },
     });
+    return user?.isActive ? { id: user.id } : null;
   }
 
   /**
@@ -384,9 +396,10 @@ export class UsersService {
    * @returns Username object or null if not found/inactive
    */
   async getUsernameById(userId: number): Promise<{ username: string } | null> {
-    return this.prisma.user.findUnique({
-      where: { id: userId, isActive: true },
-      select: { username: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, isActive: true },
     });
+    return user?.isActive ? { username: user.username } : null;
   }
 }
