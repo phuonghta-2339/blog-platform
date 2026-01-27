@@ -96,6 +96,92 @@ export class ArticlesService {
   }
 
   /**
+   * Validate article exists by ID (minimal validation)
+   * Specialized method for quick existence checks
+   * @param articleId - Article ID
+   * @param tx - Optional transaction client
+   * @throws NotFoundException if article not found
+   */
+  async validateArticleExistsById(
+    articleId: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx || this.prisma;
+
+    const article = await client.article.findUnique({
+      where: { id: articleId },
+      select: { id: true },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+  }
+
+  /**
+   * Validate article exists and is published by ID
+   * Specialized method for operations requiring published articles
+   * @param articleId - Article ID
+   * @param tx - Optional transaction client
+   * @throws NotFoundException if article not found
+   * @throws BadRequestException if article is not published
+   */
+  async validateArticlePublishedById(
+    articleId: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const client = tx || this.prisma;
+
+    const article = await client.article.findUnique({
+      where: { id: articleId },
+      select: {
+        id: true,
+        isPublished: true,
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    if (!article.isPublished) {
+      throw new BadRequestException(
+        'Cannot perform operation on unpublished articles',
+      );
+    }
+  }
+
+  /**
+   * Get article summary fields by ID
+   * Returns commonly needed fields for favorite/comment operations
+   * @param articleId - Article ID
+   * @param tx - Optional transaction client
+   * @returns Article with slug, title, and favoritesCount
+   * @throws NotFoundException if article not found
+   */
+  async getArticleSummaryById(
+    articleId: number,
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ slug: string; title: string; favoritesCount: number }> {
+    const client = tx || this.prisma;
+
+    const article = await client.article.findUnique({
+      where: { id: articleId },
+      select: {
+        slug: true,
+        title: true,
+        favoritesCount: true,
+      },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    return article;
+  }
+
+  /**
    * Generate unique slug within transaction with retry logic
    * Handles concurrent slug generation by retrying on unique constraint violation
    * @param tx - Prisma transaction client
@@ -550,49 +636,6 @@ export class ArticlesService {
       );
     } catch (error) {
       handlePrismaError(error as Error, 'getFeed', this.logger);
-    }
-  }
-
-  /**
-   * Get single article by slug
-   * @param slug - Article slug
-   * @param currentUserId - Current user ID (optional)
-   * @returns Article details
-   * @throws NotFoundException if article not found
-   */
-  async findOne(
-    slug: string,
-    currentUserId?: number,
-  ): Promise<ArticleResponseDto> {
-    try {
-      const article = await this.prisma.article.findUnique({
-        where: { slug },
-        include: this.getArticleIncludeConfig(currentUserId),
-      });
-
-      if (!article) {
-        throw new NotFoundException(`Article with slug "${slug}" not found`);
-      }
-
-      // Check if user follows the author
-      let isFollowing = false;
-      if (currentUserId && currentUserId !== article.author.id) {
-        const follow = await this.prisma.follow.findFirst({
-          where: {
-            followerId: currentUserId,
-            followingId: article.author.id,
-          },
-        });
-        isFollowing = !!follow;
-      }
-
-      return this.mapToArticleResponse(
-        article as unknown as ArticleWithRelations,
-        currentUserId,
-        isFollowing,
-      );
-    } catch (error) {
-      handlePrismaError(error as Error, 'findOne', this.logger);
     }
   }
 

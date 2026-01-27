@@ -53,3 +53,9 @@ export const ARTICLE_UPDATABLE_FIELDS = [
   'tagList',
   'isPublished',
 ] as const;
+
+/**
+ * Comment field constraints
+ */
+export const COMMENT_BODY_MIN_LENGTH = 1;
+export const COMMENT_BODY_MAX_LENGTH = 2000;
