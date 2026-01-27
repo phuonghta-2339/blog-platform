@@ -33,7 +33,6 @@ import { PaginatedFollowsDto } from './dto/paginated-follows.dto';
  * Handles follow/unfollow operations and followers/following lists
  */
 @ApiTags('follows')
-@ApiBearerAuth()
 @ApiExtraModels(FollowResponseDto, PaginatedFollowsDto, BaseResponseDto)
 @Controller('profiles/:username')
 export class FollowsController {
@@ -48,6 +47,7 @@ export class FollowsController {
    */
   @Post('follow')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Follow a user',
     description:
@@ -115,6 +115,7 @@ export class FollowsController {
    */
   @Delete('follow')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Unfollow a user',
     description:
@@ -164,6 +165,7 @@ export class FollowsController {
    */
   @Get('followers')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: "Get user's followers",
     description:
@@ -215,6 +217,7 @@ export class FollowsController {
    */
   @Get('following')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Get users that this user is following',
     description:

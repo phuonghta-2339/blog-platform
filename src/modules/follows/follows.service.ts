@@ -71,8 +71,6 @@ export class FollowsService {
   private async invalidateFollowCaches(username: string): Promise<void> {
     const cacheKeys = [
       CacheKeys.userProfile(username),
-      this.getFollowersCacheKey(username),
-      this.getFollowingCacheKey(username),
       this.getFollowedUserIdsCacheKey(username),
     ];
 
@@ -83,21 +81,19 @@ export class FollowsService {
   }
 
   /**
-   * Get cache key for followers list
-   * @param username - Username
-   * @returns Cache key
+   * Invalidate following status cache for specific follower-following pair
+   * @param followerId - Follower user ID
+   * @param followingId - Following user ID
    */
-  private getFollowersCacheKey(username: string): string {
-    return `followers:${username}`;
-  }
-
-  /**
-   * Get cache key for following list
-   * @param username - Username
-   * @returns Cache key
-   */
-  private getFollowingCacheKey(username: string): string {
-    return `following:${username}`;
+  private async invalidateFollowingStatusCache(
+    followerId: number,
+    followingId: number,
+  ): Promise<void> {
+    const cacheKey = this.getFollowingStatusCacheKey(followerId, followingId);
+    await this.cacheManager.del(cacheKey);
+    this.logger.debug(
+      `Invalidated following status cache for ${followerId} -> ${followingId}`,
+    );
   }
 
   /**
@@ -192,6 +188,7 @@ export class FollowsService {
       currentUserData
         ? this.invalidateFollowCaches(currentUserData.username)
         : Promise.resolve(),
+      this.invalidateFollowingStatusCache(currentUserId, targetUser.id),
     ]);
 
     // Get updated follower count
@@ -275,6 +272,7 @@ export class FollowsService {
       currentUserData
         ? this.invalidateFollowCaches(currentUserData.username)
         : Promise.resolve(),
+      this.invalidateFollowingStatusCache(currentUserId, targetUser.id),
     ]);
 
     // Get updated follower count
