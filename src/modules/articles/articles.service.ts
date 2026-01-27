@@ -640,6 +640,49 @@ export class ArticlesService {
   }
 
   /**
+   * Get single article by slug
+   * @param slug - Article slug
+   * @param currentUserId - Current user ID (optional)
+   * @returns Article details
+   * @throws NotFoundException if article not found
+   */
+  async findOne(
+    slug: string,
+    currentUserId?: number,
+  ): Promise<ArticleResponseDto> {
+    try {
+      const article = await this.prisma.article.findUnique({
+        where: { slug },
+        include: this.getArticleIncludeConfig(currentUserId),
+      });
+
+      if (!article) {
+        throw new NotFoundException(`Article with slug "${slug}" not found`);
+      }
+
+      // Check if user follows the author
+      let isFollowing = false;
+      if (currentUserId && currentUserId !== article.author.id) {
+        const follow = await this.prisma.follow.findFirst({
+          where: {
+            followerId: currentUserId,
+            followingId: article.author.id,
+          },
+        });
+        isFollowing = !!follow;
+      }
+
+      return this.mapToArticleResponse(
+        article as unknown as ArticleWithRelations,
+        currentUserId,
+        isFollowing,
+      );
+    } catch (error) {
+      handlePrismaError(error as Error, 'findOne', this.logger);
+    }
+  }
+
+  /**
    * Update article by id
    * @param id - Article id
    * @param updateDto - Update data

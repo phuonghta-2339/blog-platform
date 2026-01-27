@@ -273,41 +273,6 @@ export class CommentsService {
   }
 
   /**
-   * Get single comment by ID
-   * @param commentId - Comment ID
-   * @param currentUserId - Current user ID (optional, for following status)
-   * @returns Comment
-   */
-  async findOne(
-    commentId: number,
-    currentUserId?: number,
-  ): Promise<CommentResponseDto> {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
-      include: this.getCommentIncludeConfig(),
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
-
-    // Check following status if user is authenticated
-    let following = false;
-    if (currentUserId) {
-      const followCheck = await this.prisma.follow.findFirst({
-        where: {
-          followerId: currentUserId,
-          followingId: comment.author.id,
-        },
-        select: { id: true },
-      });
-      following = !!followCheck;
-    }
-
-    return this.mapToCommentResponse(comment, following);
-  }
-
-  /**
    * Delete a comment
    * Uses transaction to atomically decrement article.commentsCount
    * Validates route consistency by ensuring comment belongs to specified article
