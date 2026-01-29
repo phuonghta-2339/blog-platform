@@ -1,5 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { AppConfigService } from './app-config.service';
+import { Defaults } from '@/common/constants/defaults';
 
 /**
  * Setup Swagger/OpenAPI documentation for the application
@@ -7,11 +9,16 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
  * @param app - The NestJS application instance
  */
 export function setupSwagger(app: INestApplication): void {
+  const configService = app.get(AppConfigService);
+  // Use base URL without /api prefix for Swagger servers
+  const baseUrl = configService.getBaseUrl();
+  const appName = configService.app.name || Defaults.APP_NAME;
+
   // Configuration for Version 1
   const configV1 = new DocumentBuilder()
-    .setTitle('Blog Platform API v1')
+    .setTitle(`${appName} API v1`)
     .setDescription(
-      'A production-ready RESTful API for a blog platform (Medium clone) built with NestJS, Prisma, and PostgreSQL',
+      `A production-ready RESTful API for ${appName} built with NestJS, Prisma, and PostgreSQL`,
     )
     .setVersion('1.0')
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
@@ -33,6 +40,7 @@ export function setupSwagger(app: INestApplication): void {
       },
       'bearer',
     )
+    .addServer(baseUrl, 'Current Environment')
     .addServer('http://localhost:3000', 'Local Development')
     .build();
 
@@ -63,9 +71,9 @@ export function setupSwagger(app: INestApplication): void {
 
   // Configuration for all versions (overview)
   const configAll = new DocumentBuilder()
-    .setTitle('Blog Platform API')
+    .setTitle(`${appName} API`)
     .setDescription(
-      'Complete API documentation for all versions. A production-ready RESTful API for a blog platform (Medium clone) built with NestJS, Prisma, and PostgreSQL',
+      `Complete API documentation for all versions. A production-ready RESTful API for ${appName} built with NestJS, Prisma, and PostgreSQL`,
     )
     .setVersion('1.0')
     .setLicense('MIT', 'https://opensource.org/licenses/MIT')
@@ -81,6 +89,7 @@ export function setupSwagger(app: INestApplication): void {
       },
       'bearer',
     )
+    .addServer(baseUrl, 'Current Environment')
     .addServer('http://localhost:3000', 'Local Development')
     .build();
 

@@ -67,6 +67,25 @@ services:
       - "-c"
       - "max_wal_size=4GB"                       # Maximum WAL size before checkpoint trigger
 
+  # Redis (For BullMQ Queue)
+  redis:
+    image: redis:7-alpine
+    container_name: blog-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - blog-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    command: redis-server --appendonly yes
+
   # pgAdmin (Optional - Database Management UI)
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -99,6 +118,9 @@ volumes:
   pgadmin_data:
     external: true
     name: blog_platform_pgadmin_data
+  redis_data:
+    driver: local
+    name: blog_platform_redis_data
 
 # Custom network for service isolation
 networks:

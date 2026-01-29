@@ -1,4 +1,5 @@
 import * as Joi from 'joi';
+import { Defaults } from '@/common/constants/defaults';
 
 export const configValidationSchema = Joi.object({
   // Application
@@ -6,17 +7,39 @@ export const configValidationSchema = Joi.object({
     .valid('development', 'production', 'test')
     .default('development')
     .description('Application environment'),
-  PORT: Joi.number().port().default(3000).description('Server port'),
-  HOST: Joi.string().hostname().default('localhost').description('Server host'),
+  PORT: Joi.number()
+    .port()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.number().default(Defaults.DEV.APP_PORT),
+    })
+    .description('Server port'),
+  HOST: Joi.string()
+    .hostname()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(Defaults.DEV.APP_HOST),
+    })
+    .description('Server host'),
   APP_NAME: Joi.string()
     .min(1)
     .max(100)
-    .default('Blog Platform')
+    .default(Defaults.APP_NAME)
     .description('Application name'),
   API_PREFIX: Joi.string()
     .pattern(/^[a-z0-9/-]+$/)
-    .default('api/v1')
+    .default(Defaults.API_PREFIX)
     .description('API route prefix'),
+  APP_URL: Joi.string()
+    .uri()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(Defaults.DEV.APP_URL),
+    })
+    .description('Application URL (used for email links and CORS)'),
 
   // Database
   // Example: DATABASE_URL=postgresql://user:pass@localhost:5432/blog_test
@@ -65,7 +88,7 @@ export const configValidationSchema = Joi.object({
     .required()
     .description('Secret key for JWT token signing (minimum 32 characters)'),
   JWT_EXPIRES_IN: Joi.string()
-    .default('1h')
+    .default(Defaults.JWT_EXPIRES_IN)
     .description('JWT token expiration time (e.g., 7d, 24h, 60m)'),
   JWT_REFRESH_SECRET: Joi.string()
     .min(32)
@@ -74,6 +97,86 @@ export const configValidationSchema = Joi.object({
       'Secret key for JWT refresh token signing (minimum 32 characters)',
     ),
   JWT_REFRESH_EXPIRES_IN: Joi.string()
-    .default('7d')
+    .default(Defaults.JWT_REFRESH_EXPIRES_IN)
     .description('JWT refresh token expiration time (e.g., 30d, 7d, 24h)'),
+
+  // Redis (for BullMQ and Caching)
+  REDIS_HOST: Joi.string()
+    .hostname()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.string().default(Defaults.DEV.REDIS_HOST),
+    })
+    .description('Redis server hostname'),
+  REDIS_PORT: Joi.number()
+    .port()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.required(),
+      otherwise: Joi.number().default(Defaults.DEV.REDIS_PORT),
+    })
+    .description('Redis server port'),
+  REDIS_PASSWORD: Joi.string()
+    .allow('')
+    .default('')
+    .description('Redis password (optional)'),
+
+  // Email Provider Selection
+  MAIL_PROVIDER: Joi.string()
+    .valid('mailgun', 'sendgrid')
+    .default('mailgun')
+    .description('Email provider to use (mailgun or sendgrid)'),
+
+  // Email (Mailgun - Primary)
+  MAILGUN_API_KEY: Joi.string()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.when('MAIL_PROVIDER', {
+        is: 'mailgun',
+        then: Joi.string().required(),
+        otherwise: Joi.string().allow(''),
+      }),
+      otherwise: Joi.string().allow(''),
+    })
+    .description('Mailgun API key for sending emails'),
+  MAILGUN_DOMAIN: Joi.string()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.when('MAIL_PROVIDER', {
+        is: 'mailgun',
+        then: Joi.string().required(),
+        otherwise: Joi.string().allow(''),
+      }),
+      otherwise: Joi.string().allow(''),
+    })
+    .description('Mailgun domain for sending emails'),
+  MAILGUN_FROM_EMAIL: Joi.string()
+    .email()
+    .when('NODE_ENV', {
+      is: 'production',
+      then: Joi.when('MAIL_PROVIDER', {
+        is: 'mailgun',
+        then: Joi.string().email().required(),
+        otherwise: Joi.string().allow(''),
+      }),
+      otherwise: Joi.string().allow(''),
+    })
+    .description('Mailgun sender email address'),
+
+  // Email (SendGrid - Optional)
+  SENDGRID_API_KEY: Joi.string()
+    .allow('')
+    .description('SendGrid API key (optional fallback provider)'),
+  SENDGRID_FROM_EMAIL: Joi.string()
+    .email()
+    .allow('')
+    .description('SendGrid sender email address (optional)'),
+
+  // Admin
+  ADMIN_REPORT_RECIPIENTS: Joi.string()
+    .pattern(/^[\w.-]+@[\w.-]+\.\w+(,[\w.-]+@[\w.-]+\.\w+)*$/)
+    .allow('')
+    .default('')
+    .description('Comma-separated list of admin emails for reports'),
 });

@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { Defaults } from '@/common/constants/defaults';
 
 export interface AppConfig {
   env: string;
@@ -38,24 +39,31 @@ export default registerAs('app', (): AppConfig => {
 
   return {
     env,
-    name: process.env.APP_NAME || 'Blog Platform',
-    port: parseInt(process.env.PORT || '3000', 10),
-    host: process.env.HOST || 'localhost',
-    apiPrefix: process.env.API_PREFIX || 'api',
-    defaultVersion: process.env.API_DEFAULT_VERSION || '1',
+    name: process.env.APP_NAME || Defaults.APP_NAME,
+    // Use defaults in development, require in production
+    port: parseInt(
+      process.env.PORT ||
+        (env === 'production' ? '' : Defaults.DEV.APP_PORT.toString()),
+      10,
+    ),
+    host:
+      process.env.HOST || (env === 'production' ? '' : Defaults.DEV.APP_HOST),
+    apiPrefix: process.env.API_PREFIX || Defaults.API_PREFIX,
+    defaultVersion: process.env.API_DEFAULT_VERSION || Defaults.API_VERSION,
     corsOrigin: process.env.CORS_ORIGIN?.split(',').map((origin) =>
       origin.trim(),
-    ) || ['http://localhost:3000'],
+    ) || [Defaults.DEV.APP_URL],
     corsMethods: process.env.CORS_METHODS?.split(',').map((method) =>
       method.trim(),
     ) || ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     corsAllowedHeaders: process.env.CORS_HEADERS?.split(',').map((header) =>
       header.trim(),
     ) || ['Content-Type', 'Authorization'],
-    logLevel: process.env.LOG_LEVEL || 'info',
+    logLevel: process.env.LOG_LEVEL || Defaults.LOG_LEVEL,
     jwtSecret: jwtSecret,
-    jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1h',
+    jwtExpiresIn: process.env.JWT_EXPIRES_IN || Defaults.JWT_EXPIRES_IN,
     jwtRefreshSecret: jwtRefreshSecret,
-    jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+    jwtRefreshExpiresIn:
+      process.env.JWT_REFRESH_EXPIRES_IN || Defaults.JWT_REFRESH_EXPIRES_IN,
   };
 });

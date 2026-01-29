@@ -6,9 +6,17 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { CacheModule } from './common/cache/cache.module';
-import { appConfig, databaseConfig, AppConfigService } from './config';
+import { SettingsModule } from './common/settings/settings.module';
+import {
+  appConfig,
+  databaseConfig,
+  redisConfig,
+  mailConfig,
+  AppConfigService,
+} from './config';
 import { configValidationSchema } from './config/validation.schema';
 import { V1Module } from './v1';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -17,7 +25,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig],
+      load: [appConfig, databaseConfig, redisConfig, mailConfig],
       validationSchema: configValidationSchema,
       cache: true,
       expandVariables: true,
@@ -41,6 +49,8 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     ]),
     DatabaseModule,
     CacheModule,
+    SettingsModule,
+    NotificationsModule,
     V1Module,
   ],
   controllers: [AppController],

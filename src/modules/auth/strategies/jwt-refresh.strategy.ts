@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Request } from 'express';
 import { Strategy } from 'passport-jwt';
+import { ConfigKeys } from '@/common/constants/config-keys';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthenticatedUser } from '../interfaces/authenticated-user.interface';
 import { JwtPayload } from '../interfaces/jwt-payload.interface';
@@ -40,7 +41,9 @@ export class JwtRefreshStrategy extends PassportStrategy(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
   ) {
-    const jwtRefreshSecret = configService.get<string>('app.jwtRefreshSecret');
+    const jwtRefreshSecret = configService.get<string>(
+      ConfigKeys.APP.JWT_REFRESH_SECRET,
+    );
 
     if (!jwtRefreshSecret) {
       throw new Error(

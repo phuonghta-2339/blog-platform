@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
+import { ConfigKeys } from '@/common/constants/config-keys';
+import { Defaults } from '@/common/constants/defaults';
 import { DatabaseModule } from '@/database/database.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
@@ -26,8 +28,10 @@ import { LocalStrategy } from './strategies/local.strategy';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const jwtSecret = configService.get<string>('app.jwtSecret');
-        const expiresIn = configService.get<string>('app.jwtExpiresIn') || '1h';
+        const jwtSecret = configService.get<string>(ConfigKeys.APP.JWT_SECRET);
+        const expiresIn =
+          configService.get<string>(ConfigKeys.APP.JWT_EXPIRES_IN) ||
+          Defaults.JWT_EXPIRES_IN;
 
         if (!jwtSecret) {
           throw new Error(

@@ -18,9 +18,9 @@ async function bootstrap() {
     const configService = app.get(AppConfigService);
     const appConfig = configService.app;
 
-    // Global prefix (exclude root and health endpoints)
+    // Global prefix (exclude root, health, and admin routes from the prefix)
     app.setGlobalPrefix(appConfig.apiPrefix, {
-      exclude: ['/', 'health'],
+      exclude: ['/', 'health', 'admin/queues/{*path}'],
     });
 
     // Enable versioning
