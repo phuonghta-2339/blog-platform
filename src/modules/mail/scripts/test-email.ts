@@ -19,30 +19,44 @@ import {
 const logger = new Logger('TestEmailScript');
 
 /**
+ * Generic helper to execute an email test
+ */
+async function executeTest(
+  mailService: MailService,
+  payload: EmailPayload,
+  testDescription: string,
+): Promise<void> {
+  logger.log(`🧪 Testing ${testDescription}...`);
+
+  const jobName = `test-${payload.template}`;
+  const success = await mailService.sendEmail(payload, jobName);
+
+  if (success) {
+    logger.log(`✅ ${testDescription} sent successfully!`);
+  } else {
+    throw new Error(`${testDescription} failed to send`);
+  }
+}
+
+/**
  * Test welcome email template
  */
 async function testWelcomeEmail(
   mailService: MailService,
   recipientEmail: string,
 ): Promise<void> {
-  logger.log('🧪 Testing Welcome Email Template...');
-
+  const config = MAIL_TEST_CONFIG.WELCOME;
   const payload: EmailPayload = {
     to: recipientEmail,
-    subject: MAIL_TEST_CONFIG.WELCOME.subject,
+    subject: config.subject,
     template: EmailTemplate.WELCOME,
     variables: {
-      username: MAIL_TEST_CONFIG.WELCOME.username,
-      loginUrl: MAIL_TEST_CONFIG.WELCOME.loginUrl,
+      username: config.username,
+      loginUrl: config.loginUrl,
     },
   };
 
-  const success = await mailService.sendEmail(payload, 'test-welcome-email');
-  if (success) {
-    logger.log('✅ Welcome email sent successfully!');
-  } else {
-    throw new Error('Welcome email failed to send');
-  }
+  await executeTest(mailService, payload, 'Welcome Email');
 }
 
 /**
@@ -52,28 +66,19 @@ async function testNewFollowerEmail(
   mailService: MailService,
   recipientEmail: string,
 ): Promise<void> {
-  logger.log('🧪 Testing New Follower Email Template...');
-
+  const config = MAIL_TEST_CONFIG.NEW_FOLLOWER;
   const payload: EmailPayload = {
     to: recipientEmail,
-    subject: MAIL_TEST_CONFIG.NEW_FOLLOWER.subject,
+    subject: config.subject,
     template: EmailTemplate.NEW_FOLLOWER,
     variables: {
-      authorName: MAIL_TEST_CONFIG.NEW_FOLLOWER.authorName,
-      followerName: MAIL_TEST_CONFIG.NEW_FOLLOWER.followerName,
-      profileUrl: MAIL_TEST_CONFIG.NEW_FOLLOWER.profileUrl,
+      authorName: config.authorName,
+      followerName: config.followerName,
+      profileUrl: config.profileUrl,
     },
   };
 
-  const success = await mailService.sendEmail(
-    payload,
-    'test-new-follower-email',
-  );
-  if (success) {
-    logger.log('✅ New follower email sent successfully!');
-  } else {
-    throw new Error('New follower email failed to send');
-  }
+  await executeTest(mailService, payload, 'New Follower Email');
 }
 
 /**

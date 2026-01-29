@@ -21,14 +21,21 @@ const logger = new Logger('PreviewTemplatesScript');
 const PREVIEW_DIR = join(process.cwd(), MAIL_PREVIEW_DIR);
 
 /**
+ * Save preview HTML to file
+ */
+function savePreview(filename: string, html: string): string {
+  const filePath = join(PREVIEW_DIR, filename);
+  writeFileSync(filePath, html, 'utf-8');
+  logger.log(`✅ Template preview saved: ${filename}`);
+  return filePath;
+}
+
+/**
  * Generate Welcome Template Preview
  */
 function generateWelcomePreview(): string {
   const { html } = renderWelcomeTemplate(MAIL_PREVIEW_CONFIG.WELCOME.data);
-  const filePath = join(PREVIEW_DIR, MAIL_PREVIEW_CONFIG.WELCOME.filename);
-  writeFileSync(filePath, html, 'utf-8');
-  logger.log(`✅ Welcome template preview saved to: ${filePath}`);
-  return filePath;
+  return savePreview(MAIL_PREVIEW_CONFIG.WELCOME.filename, html);
 }
 
 /**
@@ -38,10 +45,7 @@ function generateFollowerPreview(): string {
   const { html } = renderNewFollowerTemplate(
     MAIL_PREVIEW_CONFIG.NEW_FOLLOWER.data,
   );
-  const filePath = join(PREVIEW_DIR, MAIL_PREVIEW_CONFIG.NEW_FOLLOWER.filename);
-  writeFileSync(filePath, html, 'utf-8');
-  logger.log(`✅ New follower template preview saved to: ${filePath}`);
-  return filePath;
+  return savePreview(MAIL_PREVIEW_CONFIG.NEW_FOLLOWER.filename, html);
 }
 
 /**
