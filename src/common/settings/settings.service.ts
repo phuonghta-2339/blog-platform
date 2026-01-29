@@ -57,7 +57,27 @@ export class SettingsService {
    * @returns Boolean value
    */
   getBoolean(key: string, envKey?: string, defaultValue = false): boolean {
-    const value = this.get<string>(key, envKey, String(defaultValue));
-    return value === 'true' || value === '1' || value === 'yes';
+    const value = this.get<boolean | string | number>(
+      key,
+      envKey,
+      defaultValue,
+    );
+
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.toLowerCase().trim();
+      return (
+        normalized === 'true' || normalized === '1' || normalized === 'yes'
+      );
+    }
+
+    if (typeof value === 'number') {
+      return value === 1;
+    }
+
+    return !!value;
   }
 }

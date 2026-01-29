@@ -15,7 +15,10 @@ export const MAIL_QUEUE_NAME = 'mail_queue';
  * BullBoard configuration
  */
 export const BULL_BOARD_CONFIG = {
+  BASE_PATH: 'admin/queues',
   UI_PATH: '/admin/queues/ui',
+  // Pattern used for global prefix exclusion to ensure BullBoard UI bypasses the /api prefix
+  EXCLUDE_PATTERN: 'admin/queues/(.*)',
 };
 
 /**

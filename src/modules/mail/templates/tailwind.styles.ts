@@ -18,14 +18,14 @@ export const tw = {
 
   // Content
   content: 'padding: 40px 32px;',
-  p: 'color: #334155; font-size: 16px; line-height: 1.6; margin-bottom: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;',
+  p: "color: #334155; font-size: 16px; line-height: 1.6; margin-bottom: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;",
   h2: 'color: #0f172a; font-size: 20px; font-weight: 700; margin-bottom: 16px; line-height: 1.4;',
   strong: 'color: #1e293b; font-weight: 600;',
 
   // Buttons
   buttonContainer: 'text-align: center; margin: 32px 0 16px 0;',
   button:
-    'background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 10px; display: inline-block; font-size: 16px; font-weight: 700; shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3); transition: all 0.2s ease;',
+    'background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff !important; padding: 14px 32px; text-decoration: none; border-radius: 10px; display: inline-block; font-size: 16px; font-weight: 700; box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3); transition: all 0.2s ease;',
 
   // Footer
   footer: 'padding: 32px; text-align: center; border-top: 1px solid #f1f5f9;',

@@ -6,6 +6,7 @@ export interface AppConfig {
   name: string;
   port: number;
   host: string;
+  url: string;
   apiPrefix: string;
   defaultVersion: string;
   corsOrigin: string[];
@@ -48,6 +49,7 @@ export default registerAs('app', (): AppConfig => {
     ),
     host:
       process.env.HOST || (env === 'production' ? '' : Defaults.DEV.APP_HOST),
+    url: process.env.APP_URL || Defaults.DEV.APP_URL,
     apiPrefix: process.env.API_PREFIX || Defaults.API_PREFIX,
     defaultVersion: process.env.API_DEFAULT_VERSION || Defaults.API_VERSION,
     corsOrigin: process.env.CORS_ORIGIN?.split(',').map((origin) =>
