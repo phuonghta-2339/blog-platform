@@ -17,6 +17,7 @@ import {
 import { configValidationSchema } from './config/validation.schema';
 import { V1Module } from './v1';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -51,6 +52,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
     CacheModule,
     SettingsModule,
     NotificationsModule,
+    ReportsModule,
     V1Module,
   ],
   controllers: [AppController],

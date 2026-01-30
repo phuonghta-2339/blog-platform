@@ -868,4 +868,28 @@ export class ArticlesService {
       handlePrismaError(error as Error, 'delete', this.logger);
     }
   }
+
+  /**
+   * Get top articles by favorites count (for reports)
+   * @param limit - Number of articles to fetch
+   * @returns List of top articles with basic stats
+   */
+  async getTopLikedArticles(
+    limit: number,
+  ): Promise<{ id: number; title: string; favoritesCount: number }[]> {
+    try {
+      return await this.prisma.article.findMany({
+        orderBy: { favoritesCount: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          title: true,
+          favoritesCount: true,
+        },
+      });
+    } catch (error) {
+      handlePrismaError(error as Error, 'getTopLikedArticles', this.logger);
+      return []; // Should depend on handlePrismaError, currently unreachable if it throws
+    }
+  }
 }

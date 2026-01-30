@@ -82,6 +82,28 @@ async function testNewFollowerEmail(
 }
 
 /**
+ * Test admin daily report email template
+ */
+async function testAdminDailyReportEmail(
+  mailService: MailService,
+  recipientEmail: string,
+): Promise<void> {
+  const config = MAIL_TEST_CONFIG.ADMIN_DAILY_REPORT;
+  const payload: EmailPayload = {
+    to: recipientEmail,
+    subject: config.subject,
+    template: EmailTemplate.ADMIN_DAILY_REPORT,
+    variables: {
+      date: config.date,
+      totalLikesGained: config.totalLikesGained,
+      topArticles: config.topArticles,
+    },
+  };
+
+  await executeTest(mailService, payload, 'Admin Daily Report Email');
+}
+
+/**
  * Main test function
  */
 async function main() {
@@ -118,6 +140,10 @@ async function main() {
 
       case MAIL_TEST_TYPES.NEW_FOLLOWER:
         await testNewFollowerEmail(mailService, recipientEmail);
+        break;
+
+      case MAIL_TEST_TYPES.ADMIN_DAILY_REPORT:
+        await testAdminDailyReportEmail(mailService, recipientEmail);
         break;
 
       default:

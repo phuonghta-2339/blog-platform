@@ -282,4 +282,82 @@ export class FavoritesService {
 
     return favorites.map((f) => f.articleId);
   }
+  /**
+   * Count new favorites for an article within a date range
+   * Used for daily report statistics
+   * @param articleId - Article ID
+   * @param start - Start date
+   * @param end - End date
+   * @returns Number of favorites created in range
+   */
+  async countFavoritesForArticleInRange(
+    articleId: number,
+    start: Date,
+    end: Date,
+  ): Promise<number> {
+    try {
+      return await this.prisma.favorite.count({
+        where: {
+          articleId,
+          createdAt: {
+            gte: start,
+            lt: end,
+          },
+        },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to count favorites for article ${articleId} in range: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Return 0 instead of throwing to avoid breaking the entire report
+      return 0;
+    }
+  }
+  /**
+   * Batch count new favorites for multiple articles within a date range
+   * Used for daily report statistics - eliminates N+1 queries
+   * @param articleIds - Array of Article IDs
+   * @param start - Start date
+   * @param end - End date
+   * @returns Map of articleId to count
+   */
+  async countFavoritesForArticlesInRange(
+    articleIds: number[],
+    start: Date,
+    end: Date,
+  ): Promise<Map<number, number>> {
+    try {
+      if (!articleIds.length) {
+        return new Map();
+      }
+
+      const results = await this.prisma.favorite.groupBy({
+        by: ['articleId'],
+        where: {
+          articleId: { in: articleIds },
+          createdAt: {
+            gte: start,
+            lt: end,
+          },
+        },
+        _count: {
+          _all: true,
+        },
+      });
+
+      // Transform generic groupBy result into a Map for O(1) lookup
+      const countMap = new Map<number, number>();
+      results.forEach((result) => {
+        countMap.set(result.articleId, result._count._all);
+      });
+
+      return countMap;
+    } catch (error) {
+      this.logger.error(
+        `Failed to batch count favorites: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Return empty map on failure to not break report generation completely
+      return new Map();
+    }
+  }
 }

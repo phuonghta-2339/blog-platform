@@ -9,6 +9,7 @@ export const MAIL_PREVIEW_DIR = 'src/modules/mail/templates/preview';
 export const MAIL_PREVIEW_TYPES = {
   WELCOME: 'welcome',
   NEW_FOLLOWER: 'new-follower',
+  ADMIN_DAILY_REPORT: 'admin-daily-report',
   ALL: 'all',
 } as const;
 
@@ -18,6 +19,7 @@ export const MAIL_PREVIEW_TYPES = {
 export const MAIL_TEST_TYPES = {
   WELCOME: 'welcome',
   NEW_FOLLOWER: 'new-follower',
+  ADMIN_DAILY_REPORT: 'admin-daily-report',
 } as const;
 
 /**
@@ -39,6 +41,45 @@ export const MAIL_PREVIEW_CONFIG = {
     },
     filename: 'preview-new-follower.html',
   },
+  ADMIN_DAILY_REPORT: {
+    data: {
+      date: '2024-03-20',
+      totalLikesGained: 1250,
+      topArticles: [
+        {
+          rank: 1,
+          title: 'Mastering NestJS Microservices',
+          allTimeLikes: 5420,
+          likesGained: 154,
+        },
+        {
+          rank: 2,
+          title: 'Advanced Prisma 101',
+          allTimeLikes: 3210,
+          likesGained: 98,
+        },
+        {
+          rank: 3,
+          title: 'Clean Architecture in TypeScript',
+          allTimeLikes: 2150,
+          likesGained: 76,
+        },
+        {
+          rank: 4,
+          title: 'The Future of AI in Coding',
+          allTimeLikes: 1840,
+          likesGained: 52,
+        },
+        {
+          rank: 5,
+          title: 'Optimizing Redis Performance',
+          allTimeLikes: 1205,
+          likesGained: 34,
+        },
+      ],
+    },
+    filename: 'preview-admin-daily-report.html',
+  },
 } as const;
 
 /**
@@ -55,5 +96,18 @@ export const MAIL_TEST_CONFIG = {
     followerName: 'TestFollower',
     profileUrl: 'http://localhost:3000/profile/testfollower',
     subject: '[TEST] You Have a New Follower!',
+  },
+  ADMIN_DAILY_REPORT: {
+    date: new Date().toISOString().split('T')[0],
+    totalLikesGained: 780,
+    topArticles: [
+      {
+        rank: 1,
+        title: 'Sample Test Article',
+        allTimeLikes: 500,
+        likesGained: 25,
+      },
+    ],
+    subject: '[TEST] Daily Activity Report',
   },
 } as const;
