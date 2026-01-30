@@ -25,6 +25,16 @@ export const ConfigKeys = {
     SENDGRID_API_KEY: 'mail.sendgrid.apiKey',
     SENDGRID_FROM_EMAIL: 'mail.sendgrid.fromEmail',
   },
+  STORAGE: {
+    PROVIDER: 'storage.provider',
+    LOCAL_UPLOAD_DIR: 'storage.local.uploadDir',
+    LOCAL_URL_PREFIX: 'storage.local.urlPrefix',
+  },
+  CLOUDINARY: {
+    CLOUD_NAME: 'cloudinary.cloudName',
+    API_KEY: 'cloudinary.apiKey',
+    API_SECRET: 'cloudinary.apiSecret',
+  },
 } as const;
 
 export type ConfigKeyType = typeof ConfigKeys;

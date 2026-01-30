@@ -5,11 +5,19 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Post,
   Put,
+  UploadedFile,
+  UseInterceptors,
+  ParseFilePipe,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
   ApiExtraModels,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -23,6 +31,12 @@ import { BaseResponseDto } from '@/common/dto/response.dto';
 import { CurrentUser } from '@modules/auth/decorators/current-user.decorator';
 import { Public } from '@modules/auth/decorators/public.decorator';
 import { AuthenticatedUser } from '@modules/auth/interfaces/authenticated-user.interface';
+import {
+  ALLOWED_IMAGE_MIME_TYPES,
+  FILE_SIZE_LIMITS,
+} from '@modules/storage/constants/storage.constants';
+import { ImageFileValidator } from '@modules/storage/validators/file.validator';
+import { AvatarUploadResponseDto } from '@modules/storage/dto/avatar-upload-response.dto';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
@@ -33,7 +47,12 @@ import { PublicProfileDto } from './dto/public-profile.dto';
  * Handles user profile operations
  */
 @ApiTags('users')
-@ApiExtraModels(UserResponseDto, PublicProfileDto, BaseResponseDto)
+@ApiExtraModels(
+  UserResponseDto,
+  PublicProfileDto,
+  BaseResponseDto,
+  AvatarUploadResponseDto,
+)
 @Controller('user')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -115,6 +134,75 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ): Promise<BaseResponseDto<UserResponseDto>> {
     const data = await this.usersService.updateProfile(user.id, updateUserDto);
+    return { success: true, data };
+  }
+
+  /**
+   * Upload user avatar
+   * @param user - Current authenticated user
+   * @param file - Uploaded image file
+   * @returns Avatar upload result with URL and ID
+   */
+  @Post('avatar')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiBearerAuth('bearer')
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload user avatar',
+    description:
+      'Upload a profile avatar image. Supports JPG, JPEG, PNG, and WebP formats. Maximum file size is 5MB. Automatically replaces any existing avatar.',
+  })
+  @ApiBody({
+    description: 'Avatar image file (single file only)',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Avatar image file (JPG, JPEG, PNG, WebP, max 5MB)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiCreatedResponse({
+    description: 'Avatar uploaded successfully',
+    schema: {
+      allOf: [
+        {
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: { $ref: getSchemaPath(AvatarUploadResponseDto) },
+          },
+        },
+      ],
+    },
+  })
+  @ApiUnauthorizedResponse({
+    description: 'Unauthorized - Invalid or missing JWT token',
+  })
+  @ApiBadRequestResponse({
+    description:
+      'Bad request - File is empty, invalid file type, file too large, multiple files uploaded, or upload failed',
+  })
+  @ApiNotFoundResponse({ description: 'User not found' })
+  @UseInterceptors(FileInterceptor('file', { limits: { files: 1 } }))
+  async uploadAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new ImageFileValidator({
+            allowedMimeTypes: [...ALLOWED_IMAGE_MIME_TYPES],
+            maxSizeBytes: FILE_SIZE_LIMITS.IMAGE,
+          }),
+        ],
+      }),
+    )
+    file: Express.Multer.File,
+  ): Promise<BaseResponseDto<AvatarUploadResponseDto>> {
+    const data = await this.usersService.updateAvatar(user.id, file);
     return { success: true, data };
   }
 }

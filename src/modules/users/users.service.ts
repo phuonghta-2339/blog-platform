@@ -17,6 +17,11 @@ import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
 import { CACHE_TTL } from '@/common/constants/cache';
 import { handlePrismaError } from '@/common/helpers/database.helper';
 import { FollowsService } from '@modules/follows/follows.service';
+import {
+  FILE_STORAGE_PROVIDER,
+  IFileStorageProvider,
+} from '@modules/storage/interfaces/file-storage-provider.interface';
+import { DEFAULT_FOLDERS } from '@modules/storage/constants/storage.constants';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { PublicProfileDto } from './dto/public-profile.dto';
@@ -34,6 +39,8 @@ export class UsersService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Inject(forwardRef(() => FollowsService))
     private readonly followsService: FollowsService,
+    @Inject(FILE_STORAGE_PROVIDER)
+    private readonly storageProvider: IFileStorageProvider,
   ) {}
 
   /**
@@ -401,5 +408,97 @@ export class UsersService {
       select: { username: true, isActive: true },
     });
     return user?.isActive ? { username: user.username } : null;
+  }
+
+  /**
+   * Upload and update user avatar
+   * Handles file upload and database update atomically
+   * Automatically deletes old avatar if exists
+   * @param userId - User ID
+   * @param file - Uploaded file from Multer
+   * @returns Upload result with URL, ID, and updatedAt timestamp
+   */
+  async updateAvatar(
+    userId: number,
+    file: Express.Multer.File,
+  ): Promise<{ url: string; id: string; updatedAt: Date }> {
+    try {
+      // Step 1: Get current user to check for existing avatar
+      const currentUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          avatarId: true,
+          username: true,
+          isActive: true,
+        },
+      });
+
+      if (!currentUser || !currentUser.isActive) {
+        throw new NotFoundException('User not found');
+      }
+
+      // Step 2: Upload new avatar to storage provider
+      const uploadResult = await this.storageProvider.upload(file, {
+        folder: DEFAULT_FOLDERS.AVATARS,
+      });
+
+      // Step 3: Update database with new avatar URL and publicId
+      const updatedUser = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          avatar: uploadResult.url,
+          avatarId: uploadResult.publicId,
+        },
+        select: { updatedAt: true },
+      });
+
+      // Step 4: Delete old avatar if it exists (async, non-blocking)
+      if (currentUser.avatarId) {
+        // Pass folder context to delete method so it can resolve filename to full path if needed
+        this.storageProvider
+          .delete(currentUser.avatarId, { folder: DEFAULT_FOLDERS.AVATARS })
+          .then(() => {
+            this.logger.debug(
+              `Old avatar deleted for user ${userId}: ${currentUser.avatarId}`,
+            );
+          })
+          .catch((error) => {
+            // Log error but don't fail the request
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+            this.logger.warn(
+              `Failed to delete old avatar for user ${userId}: ${errorMessage}`,
+            );
+          });
+      }
+
+      // Step 5: Invalidate user cache
+      await this.invalidateUserCaches(currentUser.username);
+
+      this.logger.log(
+        `Avatar updated successfully for user ${userId}: ${uploadResult.url}`,
+      );
+
+      return {
+        url: uploadResult.url,
+        id: uploadResult.publicId,
+        updatedAt: updatedUser.updatedAt,
+      };
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(
+        `Failed to update avatar for user ${userId}: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw new BadRequestException('Failed to upload avatar');
+    }
   }
 }
