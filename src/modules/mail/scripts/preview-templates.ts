@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import {
   renderWelcomeTemplate,
   renderNewFollowerTemplate,
+  renderAdminDailyReportTemplate,
 } from '@modules/mail/templates';
 import {
   MAIL_PREVIEW_TYPES,
@@ -49,6 +50,16 @@ function generateFollowerPreview(): string {
 }
 
 /**
+ * Generate Admin Daily Report Preview
+ */
+function generateAdminReportPreview(): string {
+  const { html } = renderAdminDailyReportTemplate(
+    MAIL_PREVIEW_CONFIG.ADMIN_DAILY_REPORT.data,
+  );
+  return savePreview(MAIL_PREVIEW_CONFIG.ADMIN_DAILY_REPORT.filename, html);
+}
+
+/**
  * Main function
  */
 function main(): void {
@@ -77,9 +88,14 @@ function main(): void {
       generatedPaths.push(generateFollowerPreview());
       break;
 
+    case MAIL_PREVIEW_TYPES.ADMIN_DAILY_REPORT:
+      generatedPaths.push(generateAdminReportPreview());
+      break;
+
     case MAIL_PREVIEW_TYPES.ALL:
       generatedPaths.push(generateWelcomePreview());
       generatedPaths.push(generateFollowerPreview());
+      generatedPaths.push(generateAdminReportPreview());
       break;
 
     default:

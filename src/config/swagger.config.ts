@@ -41,7 +41,7 @@ export function setupSwagger(app: INestApplication): void {
       'bearer',
     )
     .addServer(baseUrl, 'Current Environment')
-    .addServer('http://localhost:3000', 'Local Development')
+    .addServer(Defaults.DEV.APP_URL, 'Local Development')
     .build();
 
   // Create document for v1 - only include v1 controllers
@@ -90,7 +90,7 @@ export function setupSwagger(app: INestApplication): void {
       'bearer',
     )
     .addServer(baseUrl, 'Current Environment')
-    .addServer('http://localhost:3000', 'Local Development')
+    .addServer(Defaults.DEV.APP_URL, 'Local Development')
     .build();
 
   // Create document for all versions

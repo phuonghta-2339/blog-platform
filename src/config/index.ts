@@ -8,3 +8,4 @@ export * from './validation.schema';
 export * from './swagger.config';
 export * from './redis.config';
 export * from './mail.config';
+export * from './storage.config';

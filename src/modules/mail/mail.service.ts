@@ -5,6 +5,7 @@ import { SettingsService } from '@/common/settings/settings.service';
 import {
   renderWelcomeTemplate,
   renderNewFollowerTemplate,
+  renderAdminDailyReportTemplate,
   RenderedEmail,
 } from './templates';
 import {
@@ -42,6 +43,8 @@ export class MailService {
         return renderWelcomeTemplate(payload.variables);
       case EmailTemplate.NEW_FOLLOWER:
         return renderNewFollowerTemplate(payload.variables);
+      case EmailTemplate.ADMIN_DAILY_REPORT:
+        return renderAdminDailyReportTemplate(payload.variables);
       default: {
         const _exhaustiveCheck: never = payload;
         throw new Error(`Unknown template: ${String(_exhaustiveCheck)}`);

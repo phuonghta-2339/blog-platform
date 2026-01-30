@@ -1,5 +1,10 @@
 import * as Joi from 'joi';
 import { Defaults } from '@/common/constants/defaults';
+import {
+  MailProviderType,
+  StorageProviderType,
+} from '@/common/constants/providers';
+import { LOCAL_STORAGE_CONFIG } from '@/modules/storage/constants/storage.constants';
 
 export const configValidationSchema = Joi.object({
   // Application
@@ -63,7 +68,7 @@ export const configValidationSchema = Joi.object({
     )
     .when('NODE_ENV', {
       is: 'production',
-      then: Joi.string().required().invalid('*', 'http://localhost:3000'),
+      then: Joi.string().required().invalid('*', Defaults.DEV.APP_URL),
       otherwise: Joi.string(),
     })
     .description('Comma-separated list of allowed CORS origins'),
@@ -124,16 +129,18 @@ export const configValidationSchema = Joi.object({
 
   // Email Provider Selection
   MAIL_PROVIDER: Joi.string()
-    .valid('mailgun', 'sendgrid')
-    .default('mailgun')
-    .description('Email provider to use (mailgun or sendgrid)'),
+    .valid(...Object.values(MailProviderType))
+    .default(MailProviderType.MAILGUN)
+    .description(
+      `Email provider to use (${Object.values(MailProviderType).join(' or ')})`,
+    ),
 
   // Email (Mailgun - Primary)
   MAILGUN_API_KEY: Joi.string()
     .when('NODE_ENV', {
       is: 'production',
       then: Joi.when('MAIL_PROVIDER', {
-        is: 'mailgun',
+        is: MailProviderType.MAILGUN,
         then: Joi.string().required(),
         otherwise: Joi.string().allow(''),
       }),
@@ -144,7 +151,7 @@ export const configValidationSchema = Joi.object({
     .when('NODE_ENV', {
       is: 'production',
       then: Joi.when('MAIL_PROVIDER', {
-        is: 'mailgun',
+        is: MailProviderType.MAILGUN,
         then: Joi.string().required(),
         otherwise: Joi.string().allow(''),
       }),
@@ -156,7 +163,7 @@ export const configValidationSchema = Joi.object({
     .when('NODE_ENV', {
       is: 'production',
       then: Joi.when('MAIL_PROVIDER', {
-        is: 'mailgun',
+        is: MailProviderType.MAILGUN,
         then: Joi.string().email().required(),
         otherwise: Joi.string().allow(''),
       }),
@@ -179,4 +186,45 @@ export const configValidationSchema = Joi.object({
     .allow('')
     .default('')
     .description('Comma-separated list of admin emails for reports'),
+
+  // Storage
+  STORAGE_PROVIDER: Joi.string()
+    .valid(...Object.values(StorageProviderType))
+    .default(StorageProviderType.MULTER)
+    .description(
+      `Storage provider to use (${Object.values(StorageProviderType).join(' or ')})`,
+    ),
+  LOCAL_UPLOAD_DIR: Joi.string()
+    .default(LOCAL_STORAGE_CONFIG.UPLOAD_DIR)
+    .description('Local storage upload directory'),
+  LOCAL_URL_PREFIX: Joi.string()
+    .default(LOCAL_STORAGE_CONFIG.URL_PREFIX)
+    .description('URL prefix for locally stored files'),
+
+  // Storage (Cloudinary - Optional)
+  CLOUDINARY_CLOUD_NAME: Joi.string()
+    .when('STORAGE_PROVIDER', {
+      is: StorageProviderType.CLOUDINARY,
+      then: Joi.string().required(),
+      otherwise: Joi.string().allow(''),
+    })
+    .description(
+      'Cloudinary cloud name (required if using cloudinary provider)',
+    ),
+  CLOUDINARY_API_KEY: Joi.string()
+    .when('STORAGE_PROVIDER', {
+      is: StorageProviderType.CLOUDINARY,
+      then: Joi.string().required(),
+      otherwise: Joi.string().allow(''),
+    })
+    .description('Cloudinary API key (required if using cloudinary provider)'),
+  CLOUDINARY_API_SECRET: Joi.string()
+    .when('STORAGE_PROVIDER', {
+      is: StorageProviderType.CLOUDINARY,
+      then: Joi.string().required(),
+      otherwise: Joi.string().allow(''),
+    })
+    .description(
+      'Cloudinary API secret (required if using cloudinary provider)',
+    ),
 });

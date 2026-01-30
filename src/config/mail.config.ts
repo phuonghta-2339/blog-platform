@@ -5,6 +5,7 @@
  */
 
 import { registerAs } from '@nestjs/config';
+import { MailProviderType } from '@/common/constants/providers';
 
 export const mailConfig = registerAs('mail', () => ({
   // Mailgun (Primary Provider)
@@ -21,7 +22,9 @@ export const mailConfig = registerAs('mail', () => ({
     fromEmail: process.env.SENDGRID_FROM_EMAIL || '',
   },
   // Provider selection
-  provider: (process.env.MAIL_PROVIDER || 'mailgun').toLowerCase(),
+  provider: (
+    process.env.MAIL_PROVIDER || MailProviderType.MAILGUN
+  ).toLowerCase(),
   // Admin recipients for reports
   adminRecipients:
     process.env.ADMIN_REPORT_RECIPIENTS?.split(',').filter(Boolean) || [],

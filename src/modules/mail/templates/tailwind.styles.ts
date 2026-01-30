@@ -38,4 +38,15 @@ export const tw = {
     'display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;',
   badgeSuccess: 'background-color: #f0fdf4; color: #166534;',
   badgeInfo: 'background-color: #eff6ff; color: #1e40af;',
+
+  // Tables
+  table: 'width: 100%; border-collapse: collapse; margin-bottom: 24px;',
+  th: 'padding: 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #f1f5f9; color: #64748b; font-size: 13px; text-transform: uppercase;',
+  td: 'padding: 12px; border-bottom: 1px solid #f1f5f9; color: #334155; font-size: 14px;',
+  tdCenter: 'text-align: center;',
+  tdRight: 'text-align: right;',
+  statsContainer:
+    'background-color: #f8fafc; padding: 24px; border-radius: 12px; margin-bottom: 32px; border: 1px solid #f1f5f9;',
+  statsValue: 'font-size: 24px; font-weight: 800; color: #4f46e5; margin: 0;',
+  statsLabel: 'font-size: 14px; color: #64748b; margin: 4px 0 0 0;',
 };

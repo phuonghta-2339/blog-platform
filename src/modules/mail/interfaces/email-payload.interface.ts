@@ -4,6 +4,7 @@
 export enum EmailTemplate {
   WELCOME = 'welcome',
   NEW_FOLLOWER = 'new-follower',
+  ADMIN_DAILY_REPORT = 'admin-daily-report',
 }
 
 /**
@@ -48,6 +49,26 @@ export interface NewFollowerEmailPayload extends BaseEmailPayload {
 }
 
 /**
+ * Admin Daily Report email payload
+ */
+export interface AdminDailyReportPayload extends BaseEmailPayload {
+  template: EmailTemplate.ADMIN_DAILY_REPORT;
+  variables: {
+    date: string;
+    totalLikesGained: number;
+    topArticles: ReadonlyArray<{
+      rank: number;
+      title: string;
+      allTimeLikes: number;
+      likesGained: number; // Delta
+    }>;
+  };
+}
+
+/**
  * Union type for all email payloads
  */
-export type EmailPayload = WelcomeEmailPayload | NewFollowerEmailPayload;
+export type EmailPayload =
+  | WelcomeEmailPayload
+  | NewFollowerEmailPayload
+  | AdminDailyReportPayload;

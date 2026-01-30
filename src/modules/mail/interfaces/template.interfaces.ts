@@ -27,6 +27,20 @@ export interface NewFollowerEmailVars {
 }
 
 /**
+ * Variables for the Admin Daily Report template
+ */
+export interface AdminDailyReportVars {
+  date: string;
+  totalLikesGained: number;
+  topArticles: ReadonlyArray<{
+    rank: number;
+    title: string;
+    allTimeLikes: number;
+    likesGained: number;
+  }>;
+}
+
+/**
  * Common return type for all template renderers
  */
 export interface RenderedEmail {
