@@ -55,7 +55,16 @@ export class AppConfigService {
   }
 
   /**
-   * Get full API base URL
+   * Get base URL without API prefix
+   */
+  getBaseUrl(): string {
+    const { host, port } = this.app;
+    const displayHost = host === '0.0.0.0' ? 'localhost' : host;
+    return `http://${displayHost}:${port}`;
+  }
+
+  /**
+   * Get full API base URL (with prefix)
    */
   getApiUrl(): string {
     const { host, port, apiPrefix } = this.app;

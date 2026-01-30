@@ -6,3 +6,5 @@ export * from './app.config';
 export * from './database.config';
 export * from './validation.schema';
 export * from './swagger.config';
+export * from './redis.config';
+export * from './mail.config';

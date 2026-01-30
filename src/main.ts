@@ -5,6 +5,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { setupSwagger } from './config/swagger.config';
 import { AppConfigService } from './config';
+import { GLOBAL_PREFIX_EXCLUDE } from '@common/constants/routing.constants';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -18,9 +19,9 @@ async function bootstrap() {
     const configService = app.get(AppConfigService);
     const appConfig = configService.app;
 
-    // Global prefix (exclude root and health endpoints)
+    // Global prefix (exclude specific routes from the prefix)
     app.setGlobalPrefix(appConfig.apiPrefix, {
-      exclude: ['/', 'health'],
+      exclude: GLOBAL_PREFIX_EXCLUDE,
     });
 
     // Enable versioning

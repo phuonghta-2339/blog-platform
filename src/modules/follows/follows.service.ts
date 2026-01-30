@@ -7,6 +7,7 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Cache } from 'cache-manager';
 import { Prisma } from '@prisma/client';
 import { plainToInstance } from 'class-transformer';
@@ -14,7 +15,10 @@ import { PrismaService } from '@/database/prisma.service';
 import { CacheKeys } from '@/common/cache/cache.config';
 import { CACHE_TTL } from '@/common/constants/cache';
 import { handlePrismaError } from '@/common/helpers/database.helper';
+import { PRISMA_ERRORS } from '@/common/constants/database';
 import { SortOrder } from '@common/constants/validation';
+import { Events } from '@/common/constants/events';
+import { UserFollowedEvent } from '@/common/events/user-followed.event';
 import { UsersService } from '@modules/users/users.service';
 import { UserProfileData } from '@modules/users/types/user-profile.type';
 import { ProfileDto } from './dto/profile.dto';
@@ -35,6 +39,7 @@ export class FollowsService {
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -253,7 +258,7 @@ export class FollowsService {
       `User ${currentUserId} attempting to follow ${targetUsername}`,
     );
 
-    // Find target user
+    // Find target user with email (fetch before any DB writes to avoid race conditions)
     const targetUser =
       await this.usersService.getUserProfileByUsername(targetUsername);
 
@@ -266,6 +271,12 @@ export class FollowsService {
       throw new BadRequestException('You cannot follow yourself');
     }
 
+    // Get target user email for notification (before follow creation)
+    const targetUserWithEmail = await this.usersService.findById(targetUser.id);
+    const targetUserEmail = targetUserWithEmail?.email;
+
+    let isNewFollow = false;
+
     try {
       // Idempotent create - no error if already exists
       await this.prisma.follow.create({
@@ -275,6 +286,7 @@ export class FollowsService {
         },
       });
 
+      isNewFollow = true;
       this.logger.debug(
         `User ${currentUserId} followed ${targetUsername} successfully`,
       );
@@ -282,7 +294,7 @@ export class FollowsService {
       // If unique constraint violation (already following), continue silently
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === PRISMA_ERRORS.UNIQUE_CONSTRAINT
       ) {
         this.logger.debug(
           `User ${currentUserId} already follows ${targetUsername}, continuing`,
@@ -307,6 +319,20 @@ export class FollowsService {
         : Promise.resolve(),
       this.invalidateFollowingStatusCache(currentUserId, targetUser.id),
     ]);
+
+    // Emit event for follower notification (only for new follows)
+    if (isNewFollow && currentUserData && targetUserEmail) {
+      this.eventEmitter.emit(
+        Events.USER_FOLLOWED,
+        new UserFollowedEvent(
+          currentUserId,
+          targetUser.id,
+          currentUserData.username,
+          targetUser.username,
+          targetUserEmail,
+        ),
+      );
+    }
 
     // Get updated follower count
     const followersCount = await this.prisma.follow.count({

@@ -5,10 +5,16 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Prisma, User } from '@prisma/client';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Prisma, User, Role } from '@prisma/client';
 import { hash, compare } from 'bcrypt';
 import { PrismaService } from '@/database/prisma.service';
 import { BCRYPT_SALT_ROUNDS } from '@/common/constants/crypt';
+import { PRISMA_ERRORS } from '@/common/constants/database';
+import { ConfigKeys } from '@/common/constants/config-keys';
+import { Defaults } from '@/common/constants/defaults';
+import { Events } from '@/common/constants/events';
+import { UserRegisteredEvent } from '@/common/events/user-registered.event';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -24,6 +30,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -46,7 +53,7 @@ export class AuthService {
           email,
           username,
           password: hashedPassword,
-          role: 'USER',
+          role: Role.USER,
           isActive: true,
         },
       });
@@ -54,7 +61,7 @@ export class AuthService {
       // Handle unique constraint violations
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
+        error.code === PRISMA_ERRORS.UNIQUE_CONSTRAINT
       ) {
         // Get the field that caused the unique constraint violation
         const target = error.meta?.target as string[] | undefined;
@@ -81,6 +88,12 @@ export class AuthService {
     try {
       const token = this.generateToken(user);
       const refreshToken = this.generateRefreshToken(user);
+
+      // Emit event for welcome email (async, non-blocking)
+      this.eventEmitter.emit(
+        Events.USER_REGISTERED,
+        new UserRegisteredEvent(user.id, user.email, user.username),
+      );
 
       return {
         user: this.mapUserToDto(user),
@@ -221,7 +234,7 @@ export class AuthService {
     const payload = this.createJwtPayload(user);
 
     const refreshSecret = this.configService.get<string>(
-      'app.jwtRefreshSecret',
+      ConfigKeys.APP.JWT_REFRESH_SECRET,
     );
 
     if (!refreshSecret) {
@@ -229,7 +242,8 @@ export class AuthService {
     }
 
     const refreshExpiresIn =
-      this.configService.get<string>('app.jwtRefreshExpiresIn') || '7d';
+      this.configService.get<string>(ConfigKeys.APP.JWT_REFRESH_EXPIRES_IN) ||
+      Defaults.JWT_REFRESH_EXPIRES_IN;
 
     return this.jwtService.sign(payload as Record<string, unknown>, {
       secret: refreshSecret,

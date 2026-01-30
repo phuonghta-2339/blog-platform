@@ -135,3 +135,19 @@ model Follow {
   @@index([followingId])
   @@map("follows")
 }
+
+model EmailLog {
+  id        String   @id @default(uuid())
+  to        String   @db.VarChar(255)
+  template  String   @db.VarChar(100)
+  subject   String   @db.VarChar(255)
+  jobId     String?  @map("job_id") @db.VarChar(100)
+  status    String   @db.VarChar(50) // SENT, FAILED, PENDING
+  error     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([to])
+  @@index([status])
+  @@index([createdAt])
+  @@map("email_logs")
+}
